@@ -62,8 +62,9 @@ export function StudentShell({ children }: { children: ReactNode }) {
   }
 
   if (!student) {
-    // shouldn't happen because guards redirect, but safety
-    if (typeof window !== "undefined") router.replace("/");
+    // StudentShell is only used by AuthGuard which already redirects when
+    // student is null. If we somehow get here without a student, render
+    // nothing — the AuthGuard's useEffect will handle the redirect safely.
     return null;
   }
 

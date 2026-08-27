@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -15,12 +15,19 @@ import { cn } from "@/lib/utils";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const setAdmin = useAuth((s) => s.setAdmin);
+  const { admin, adminLoading, setAdmin } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const usernameRef = useRef<HTMLInputElement>(null);
+
+  // If already logged in as admin, skip the login form and go straight to /admin.
+  useEffect(() => {
+    if (!adminLoading && admin) {
+      router.replace("/admin");
+    }
+  }, [admin, adminLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

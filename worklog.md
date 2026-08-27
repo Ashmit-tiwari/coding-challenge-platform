@@ -641,3 +641,29 @@ Work Log:
 Stage Summary:
 - Hydration error is fully resolved. The admin overview StatCards are now clickable via router.push (client-side nav) with a "View" label, and all link-button patterns use the shadcn `asChild` slot to render valid `<a>` elements (no nested interactive elements).
 - All 18 user-facing pages verified hydration-error-free in the browser.
+
+---
+Task ID: 12
+Agent: main (Z.ai Code)
+Task: Fix ERR_TOO_MANY_REDIRECTS when opening the app in a new tab
+
+Work Log:
+- Root cause analysis: the `ERR_TOO_MANY_REDIRECTS` loop was caused by **render-phase side effects** in shared layout components. Specifically:
+  1. `src/components/student-shell.tsx` line 66: `if (typeof window !== "undefined") router.replace("/");` ran during render whenever `student` was null. React 19 may re-render the same component multiple times before navigation completes, so each render fired another `router.replace("/")` → infinite redirect loop. This is the classic "redirect during render" anti-pattern.
+  2. `src/components/admin-shell.tsx` line 33: `if (typeof window !== "undefined" && mounted) setMounted(true);` — setState during render with an inverted condition (`&& mounted` should have been `&& !mounted`), causing infinite re-renders.
+  3. The `AdminGuard` previously did a render-phase `router.replace("/admin/login")` when `!admin` — same anti-pattern.
+
+- Fixes applied (all redirects now happen inside `useEffect`, never during render):
+  - `src/components/student-shell.tsx`: removed the render-phase `router.replace("/")` fallback. The component now returns `null` when `student` is null — the wrapping `AuthGuard`'s `useEffect` handles the redirect safely (it has a `redirecting` state guard that prevents re-firing).
+  - `src/components/admin-shell.tsx`: rewrote `AdminGuard` to use a `redirecting` state flag set inside `useEffect` (mirroring the `AuthGuard` pattern). Fixed the `setMounted` setState-in-render by moving it to `useEffect(() => setMounted(true), [])`.
+  - `src/app/admin/login/page.tsx`: added a `useEffect` that redirects to `/admin` when an admin is already logged in (so clicking "Admin" in the student header doesn't dump a logged-in admin back onto the login form). Previously this page had no such guard, which was confusing but not itself a loop.
+
+- Verification (agent-browser, all clean — no console errors, no redirect loops):
+  - **No cookies**: `/` → landing ✓; `/admin` → `/admin/login` ✓; `/dashboard` → `/` ✓; `/admin/login` → stays ✓
+  - **Student only**: `/` → `/dashboard` ✓; `/dashboard` → stays ✓; `/admin` → `/admin/login` ✓; `/admin/login` → stays ✓
+  - **Admin only**: `/` → landing ✓; `/dashboard` → `/` ✓; `/admin` → stays ✓; `/admin/login` → `/admin` ✓
+  - **Both student + admin**: `/` → `/dashboard` ✓; `/admin` → stays ✓; `/admin/login` → `/admin` ✓; `/dashboard` → stays ✓; reload `/` (new tab simulation) → `/dashboard` ✓
+- `bun run lint` — clean.
+
+Stage Summary:
+- The `ERR_TOO_MANY_REDIRECTS` is fully resolved. The redirect chain is now driven entirely by `useEffect` (post-render) with one-shot `redirecting` state guards, so a component never fires `router.replace` more than once per navigation. Opening the app in a fresh tab now lands on the correct page based on session state, with no loops regardless of which combination of student/admin cookies is present.

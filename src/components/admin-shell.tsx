@@ -30,7 +30,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (typeof window !== "undefined" && mounted) setMounted(true);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -109,12 +111,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
 export function AdminGuard({ children }: { children: ReactNode }) {
   const { admin, adminLoading } = useAuth();
   const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
+
   useEffect(() => {
     if (!adminLoading && !admin) {
+      setRedirecting(true);
       router.replace("/admin/login");
     }
   }, [adminLoading, admin, router]);
-  if (adminLoading) {
+
+  if (adminLoading || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading admin…</div>
