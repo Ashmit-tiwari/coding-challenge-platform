@@ -313,12 +313,18 @@ function NotificationsContent() {
                       isUnread && "bg-primary/5",
                     )}
                   >
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleRowClick(n)}
-                      disabled={markingIds.has(n.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleRowClick(n);
+                        }
+                      }}
                       className={cn(
-                        "w-full text-left px-4 sm:px-5 py-4 flex items-start gap-3 transition-colors",
+                        "w-full text-left px-4 sm:px-5 py-4 flex items-start gap-3 transition-colors select-none",
                         clickable
                           ? "hover:bg-muted/50 cursor-pointer"
                           : "cursor-default",
@@ -383,7 +389,7 @@ function NotificationsContent() {
                             markAsRead(n.id);
                           }}
                           disabled={markingIds.has(n.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-muted-foreground hover:text-primary shrink-0 mt-1"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-muted-foreground hover:text-primary shrink-0 mt-1 p-1 rounded-md hover:bg-muted"
                           aria-label="Mark as read"
                         >
                           {markingIds.has(n.id) ? (
@@ -393,7 +399,7 @@ function NotificationsContent() {
                           )}
                         </button>
                       )}
-                    </button>
+                    </div>
                   </motion.li>
                 );
               })}

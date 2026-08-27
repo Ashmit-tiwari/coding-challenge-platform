@@ -36,13 +36,20 @@ export async function GET(req: NextRequest) {
     take: 50,
   });
 
-  // contribution calendar: count solves per date
+  // contribution calendar: count solves and completions per date
   const solveDates = await db.activityLog.findMany({
     where: { userId: user.id, type: "solve" },
-    select: { date: true },
+    select: { date: true, createdAt: true },
   });
   const dateCount: Record<string, number> = {};
-  for (const d of solveDates) if (d.date) dateCount[d.date] = (dateCount[d.date] || 0) + 1;
+  for (const d of solveDates) {
+    const key = d.date || (d.createdAt ? d.createdAt.toISOString().slice(0, 10) : null);
+    if (key) dateCount[key] = (dateCount[key] || 0) + 1;
+  }
+  for (const s of solvedSubs) {
+    const key = s.createdAt.toISOString().slice(0, 10);
+    dateCount[key] = (dateCount[key] || 0) + 1;
+  }
 
   const levelInfo = computeLevelInfo(user.xp);
 

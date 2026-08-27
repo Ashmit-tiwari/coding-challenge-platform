@@ -352,10 +352,11 @@ function ymdLocal(d: Date) {
 }
 
 function contributionColor(count: number) {
-  if (count <= 0) return "bg-muted";
-  if (count === 1) return "bg-emerald-200 dark:bg-emerald-900/70";
-  if (count === 2) return "bg-emerald-400 dark:bg-emerald-700";
-  return "bg-emerald-600 dark:bg-emerald-500";
+  if (count <= 0) return "bg-muted/40 dark:bg-muted/20 border border-border/30 hover:border-border/80";
+  if (count === 1) return "bg-emerald-400/70 dark:bg-emerald-900/90 border border-emerald-500/40 text-white shadow-[0_0_6px_rgba(16,185,129,0.25)]";
+  if (count === 2) return "bg-emerald-500 dark:bg-emerald-700 border border-emerald-400/50 text-white shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+  if (count <= 4) return "bg-emerald-600 dark:bg-emerald-500 border border-emerald-300/60 text-white shadow-[0_0_10px_rgba(16,185,129,0.45)]";
+  return "bg-emerald-700 dark:bg-emerald-400 border border-emerald-200/70 text-white shadow-[0_0_12px_rgba(16,185,129,0.6)]";
 }
 
 // Build 12 weeks of submission counts for the performance bar chart
@@ -648,18 +649,7 @@ function ProfileView({
                 </div>
               </CardHeader>
               <CardContent className="px-0">
-                {activeDays === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border/70 bg-muted/30 p-6 text-center">
-                    <Sparkles className="h-5 w-5 mx-auto text-primary mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      {data.isOwn
-                        ? "Solve your first challenge to light up the grid!"
-                        : "No coding activity recorded yet."}
-                    </p>
-                  </div>
-                ) : (
-                  <ContributionCalendar data={contributionCalendar || {}} />
-                )}
+                <ContributionCalendar data={contributionCalendar || {}} isOwn={data.isOwn} />
               </CardContent>
             </Card>
           </motion.div>
@@ -1269,7 +1259,13 @@ function FeaturedBadges({
 // ---------------------------------------------------------------------------
 // Contribution calendar (52 weeks)
 // ---------------------------------------------------------------------------
-function ContributionCalendar({ data }: { data: Record<string, number> }) {
+function ContributionCalendar({
+  data,
+  isOwn,
+}: {
+  data: Record<string, number>;
+  isOwn?: boolean;
+}) {
   const grid = useMemo(() => {
     const today = new Date();
     const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -1291,6 +1287,14 @@ function ContributionCalendar({ data }: { data: Record<string, number> }) {
     return { weeks, todayMid };
   }, []);
 
+  const totalChallengesCompleted = useMemo(() => {
+    return Object.values(data || {}).reduce((sum, count) => sum + count, 0);
+  }, [data]);
+
+  const activeDaysCount = useMemo(() => {
+    return Object.values(data || {}).filter((count) => count > 0).length;
+  }, [data]);
+
   const monthLabels = useMemo(() => {
     return grid.weeks.map((week, i) => {
       const thisMonth = week[0].getMonth();
@@ -1300,59 +1304,96 @@ function ContributionCalendar({ data }: { data: Record<string, number> }) {
   }, [grid]);
 
   return (
-    <div className="overflow-x-auto custom-scrollbar pb-2 -mx-1 px-1">
-      <div className="inline-block min-w-full">
-        <div className="flex gap-[3px] pl-9 mb-1.5">
-          {monthLabels.map((label, i) => (
-            <div
-              key={i}
-              className="w-[11px] text-[10px] leading-none text-muted-foreground whitespace-nowrap"
-            >
-              {label ? <span className="block -translate-x-0.5">{label}</span> : null}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col gap-[3px]">
-          {WEEKDAY_LABELS.map((label, rowIdx) => (
-            <div key={rowIdx} className="flex items-center gap-[3px]">
-              <div className="w-8 text-[10px] leading-none text-muted-foreground pr-1 text-right">
-                {label}
+    <div className="flex flex-col gap-3">
+      {/* GitHub Calendar Grid */}
+      <div className="overflow-x-auto custom-scrollbar pb-2 -mx-1 px-1">
+        <div className="inline-block min-w-full">
+          {/* Months header */}
+          <div className="flex gap-[3px] pl-9 mb-1.5">
+            {monthLabels.map((label, i) => (
+              <div
+                key={i}
+                className="w-[12px] text-[10px] leading-none text-muted-foreground whitespace-nowrap"
+              >
+                {label ? <span className="block -translate-x-1 font-medium">{label}</span> : null}
               </div>
-              {grid.weeks.map((week, colIdx) => {
-                const date = week[rowIdx];
-                const isFuture = date > grid.todayMid;
-                const key = ymdLocal(date);
-                const count = isFuture ? 0 : data?.[key] || 0;
-                return (
-                  <Tooltip key={colIdx}>
-                    <TooltipTrigger asChild>
-                      <div
-                        className={cn(
-                          "h-[11px] w-[11px] rounded-[2px] transition-colors cursor-default",
-                          isFuture
-                            ? "bg-transparent border border-dashed border-border/40"
-                            : contributionColor(count),
+            ))}
+          </div>
+
+          {/* Heatmap rows */}
+          <div className="flex flex-col gap-[3px]">
+            {WEEKDAY_LABELS.map((label, rowIdx) => (
+              <div key={rowIdx} className="flex items-center gap-[3px]">
+                <div className="w-8 text-[10px] leading-none text-muted-foreground pr-1 text-right font-medium">
+                  {label}
+                </div>
+                {grid.weeks.map((week, colIdx) => {
+                  const date = week[rowIdx];
+                  const isFuture = date > grid.todayMid;
+                  const key = ymdLocal(date);
+                  const count = isFuture ? 0 : data?.[key] || 0;
+                  const hasSolve = count > 0;
+                  const dateFormatted = format(date, "EEE, MMM d, yyyy");
+
+                  return (
+                    <Tooltip key={colIdx}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "h-[12px] w-[12px] rounded-[2.5px] transition-all flex items-center justify-center cursor-pointer select-none",
+                            isFuture
+                              ? "bg-transparent border border-dashed border-border/30 opacity-40 cursor-default"
+                              : contributionColor(count),
+                            hasSolve && "hover:scale-125 hover:z-10",
+                          )}
+                        >
+                          {hasSolve && (
+                            <span className="h-1 w-1 rounded-full bg-white/90 shadow-sm inline-block pointer-events-none" />
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs font-medium">
+                        {isFuture ? (
+                          <span className="text-muted-foreground">{dateFormatted}</span>
+                        ) : hasSolve ? (
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-emerald-500">
+                              ✓ {count} challenge{count === 1 ? "" : "s"} completed
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">{dateFormatted}</div>
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground">
+                            No challenges completed · {dateFormatted}
+                          </div>
                         )}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      {isFuture
-                        ? key
-                        : `${count} submission${count === 1 ? "" : "s"} · ${key}`}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer Legend */}
+          <div className="flex items-center justify-between mt-3 pl-9 text-[11px] text-muted-foreground">
+            <span className="hidden sm:inline-block">
+              {totalChallengesCompleted > 0
+                ? `${totalChallengesCompleted} challenge${totalChallengesCompleted === 1 ? "" : "s"} solved across ${activeDaysCount} active day${activeDaysCount === 1 ? "" : "s"}`
+                : isOwn
+                  ? "Solve a challenge today to light up your GitHub-style streak!"
+                  : "No submissions recorded yet."}
+            </span>
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span>Less</span>
+              <div className="h-[10px] w-[10px] rounded-[2px] bg-muted/40 border border-border/30" />
+              <div className="h-[10px] w-[10px] rounded-[2px] bg-emerald-400/70 dark:bg-emerald-900/90 border border-emerald-500/40" />
+              <div className="h-[10px] w-[10px] rounded-[2px] bg-emerald-500 dark:bg-emerald-700 border border-emerald-400/50" />
+              <div className="h-[10px] w-[10px] rounded-[2px] bg-emerald-600 dark:bg-emerald-500 border border-emerald-300/60" />
+              <div className="h-[10px] w-[10px] rounded-[2px] bg-emerald-700 dark:bg-emerald-400 border border-emerald-200/70" />
+              <span>More</span>
             </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-end gap-1.5 mt-2 pl-9">
-          <span className="text-[11px] text-muted-foreground mr-1">Less</span>
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-muted" />
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-200 dark:bg-emerald-900/70" />
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-400 dark:bg-emerald-700" />
-          <div className="h-[11px] w-[11px] rounded-[2px] bg-emerald-600 dark:bg-emerald-500" />
-          <span className="text-[11px] text-muted-foreground ml-1">More</span>
+          </div>
         </div>
       </div>
     </div>
