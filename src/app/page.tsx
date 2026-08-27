@@ -50,7 +50,12 @@ export default function LandingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: `Server response error (${res.status})` };
+      }
       if (!res.ok) {
         toast.error(data.error || "Something went wrong");
         return;
