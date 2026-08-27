@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -74,7 +74,7 @@ function CodePane({ code, language, side }: { code: string; language: string; si
   );
 }
 
-export default function IntegrityComparePage() {
+function IntegrityCompareContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const pairId = (params?.pairId as string) || searchParams.get("pair") || "";
@@ -286,5 +286,14 @@ export default function IntegrityComparePage() {
         </Card>
       </div>
     </AdminGuard>
+  );
+}
+
+
+export default function IntegrityComparePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-muted-foreground">Loading integrity report…</div>}>
+      <IntegrityCompareContent />
+    </Suspense>
   );
 }
