@@ -23,9 +23,15 @@ export default function AdminLoginPage() {
   const usernameRef = useRef<HTMLInputElement>(null);
 
   // If already logged in as admin, skip the login form and go straight to /admin.
+  // Guarded against re-firing to prevent an AdminGuard ↔ AdminLoginPage redirect loop.
   useEffect(() => {
     if (!adminLoading && admin) {
-      router.replace("/admin");
+      const dest = "/admin";
+      if (adminLoginRedirectInProgress.has(dest)) return;
+      adminLoginRedirectInProgress.add(dest);
+      router.replace(dest);
+      const t = setTimeout(() => adminLoginRedirectInProgress.delete(dest), 1000);
+      return () => clearTimeout(t);
     }
   }, [admin, adminLoading, router]);
 
@@ -182,3 +188,7 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
+// Module-level redirect guard: prevents the AdminLoginPage → /admin and
+// AdminGuard → /admin/login effects from ping-ponging the user between the two.
+const adminLoginRedirectInProgress = new Set<string>();

@@ -1,18 +1,29 @@
 import { db } from "@/lib/db";
-import { getStudentSession } from "@/lib/session";
+import { getStudentSession, clearSessionCookie } from "@/lib/session";
 import { ok, unauthorized, publicUser } from "@/lib/api";
 import { computeLevelInfo, recomputeStreak } from "@/lib/progression";
 
 // GET /api/auth/me — full current student profile + level info + streak
+// If the session cookie is invalid/expired, clear it so the browser stops
+// sending a stale token on every subsequent request (prevents auth loops).
 export async function GET() {
   const session = await getStudentSession();
-  if (!session) return unauthorized("Not logged in");
+  if (!session) {
+    await clearSessionCookie("student");
+    return unauthorized("Not logged in");
+  }
   const user = await db.user.findUnique({
     where: { id: session.userId },
     include: { avatar: true },
   });
-  if (!user) return unauthorized("User not found");
-  if (user.isBanned) return unauthorized("Account suspended");
+  if (!user) {
+    await clearSessionCookie("student");
+    return unauthorized("User not found");
+  }
+  if (user.isBanned) {
+    await clearSessionCookie("student");
+    return unauthorized("Account suspended");
+  }
 
   // keep streak fresh
   const streak = await recomputeStreak(user.id);

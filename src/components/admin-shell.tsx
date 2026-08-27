@@ -108,6 +108,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Module-level redirect guard: prevents the AdminGuard → /admin/login and
+// AdminLoginPage → /admin effects from ping-ponging the user between the two.
+const adminRedirectInProgress = new Set<string>();
+
 export function AdminGuard({ children }: { children: ReactNode }) {
   const { admin, adminLoading } = useAuth();
   const router = useRouter();
@@ -115,8 +119,13 @@ export function AdminGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!adminLoading && !admin) {
+      const dest = "/admin/login";
+      if (adminRedirectInProgress.has(dest)) return;
+      adminRedirectInProgress.add(dest);
       setRedirecting(true);
-      router.replace("/admin/login");
+      router.replace(dest);
+      const t = setTimeout(() => adminRedirectInProgress.delete(dest), 1000);
+      return () => clearTimeout(t);
     }
   }, [adminLoading, admin, router]);
 

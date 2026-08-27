@@ -26,10 +26,15 @@ export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // already logged in → go to dashboard
+  // already logged in → go to dashboard (guarded against re-firing)
   useEffect(() => {
     if (!studentLoading && student) {
-      router.replace("/dashboard");
+      const dest = "/dashboard";
+      if (landingRedirectInProgress.has(dest)) return;
+      landingRedirectInProgress.add(dest);
+      router.replace(dest);
+      const t = setTimeout(() => landingRedirectInProgress.delete(dest), 1000);
+      return () => clearTimeout(t);
     }
   }, [student, studentLoading, router]);
 
@@ -221,6 +226,10 @@ export default function LandingPage() {
     </div>
   );
 }
+
+// Module-level redirect guard: prevents the LandingPage → /dashboard and
+// AuthGuard → / effects from ping-ponging the user between / and /dashboard.
+const landingRedirectInProgress = new Set<string>();
 
 const FEATURES = [
   { icon: Code2, title: "Real code execution", body: "Submit Python, C++ or JavaScript against hidden test cases in a sandboxed runner with time and memory limits." },

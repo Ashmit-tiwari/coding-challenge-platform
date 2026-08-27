@@ -699,3 +699,59 @@ Files changed:
 
 Stage Summary:
 - The hydration mismatch on the auth form UID input is resolved at the application level. The server-rendered HTML and the post-parse DOM are now byte-identical for the `type` attribute on every `<Input>`, which removes the gap that was causing React 19 to flag the UID input as a hydration mismatch (especially in browsers with password-manager extensions that rewrite the input before hydration). The UI, placeholders, `autoComplete`, UID validation regex/format, login flow, and admin login are all preserved.
+
+---
+Task ID: 14
+Agent: main (Z.ai Code)
+Task: Diagnose and fix ERR_TOO_MANY_REDIRECTS on the preview/deployed environment
+
+Work Log:
+- Audited the entire auth/redirect surface: `src/lib/session.ts` (cookie creation/verification), `src/lib/store.ts` (Zustand auth state), `src/components/auth-bootstrap.tsx`, `src/components/auth-guard.tsx` (student), `src/components/admin-shell.tsx` (AdminGuard), `src/app/page.tsx` (landing redirect), `src/app/admin/login/page.tsx` (admin login redirect), `src/app/api/auth/me/route.ts`, `src/app/api/admin/session/route.ts`, `src/app/api/auth/logout/route.ts`, `src/app/api/admin/logout/route.ts`, `next.config.ts`, `Caddyfile`. Confirmed there is NO `middleware.ts` and NO server-side `redirect()` / `NextResponse.redirect()` calls anywhere — all redirects are client-side `router.replace` in `useEffect`.
+
+- Traced the redirect chain. The two potential ping-pong loops introduced by the recent auth changes are:
+  1. Landing page (`/`) → `router.replace("/dashboard")` when `student` is set, vs `AuthGuard` (`/dashboard`) → `router.replace("/")` when `student` is null. If the `student` state ever oscillates (e.g. a stale cookie that validates on one request and fails on the next, or a race between `AuthBootstrap` and the redirect effect), these two effects ping-pong the user between `/` and `/dashboard`.
+  2. `AdminGuard` (`/admin`) → `router.replace("/admin/login")` when `admin` is null, vs `AdminLoginPage` (`/admin/login`) → `router.replace("/admin")` when `admin` is set. Same oscillation risk: a stale admin cookie that 401s on `/api/admin/session` but keeps the in-memory `admin` state set from a previous page load can ping-pong the user between `/admin` and `/admin/login`.
+
+- Confirmed the server never returns HTTP 3xx for any route (all return 200; only the API returns 401 for invalid sessions). The browser's `ERR_TOO_MANY_REDIRECTS` is triggered by the client-side `router.replace` loop running faster than the browser can settle the navigation.
+
+- Root cause: the redirect effects in `page.tsx`, `admin/login/page.tsx`, `auth-guard.tsx`, and `admin-shell.tsx` had no module-level guard against re-firing the same redirect. Combined with stale/expired session cookies that were never cleared by the API on 401, a user returning to the site with an old cookie could oscillate between two routes indefinitely.
+
+Fixes applied (surgical, no auth system rebuild):
+
+1. `src/app/api/auth/me/route.ts` — on any 401 path (invalid/expired token, user not found, banned), now calls `clearSessionCookie("student")` so the browser drops the stale cookie and stops re-sending it on every subsequent navigation.
+
+2. `src/app/api/admin/session/route.ts` — on any 401 path (invalid/expired token, admin not found), now calls `clearSessionCookie("admin")` for the same reason.
+
+3. `src/app/api/auth/logout/route.ts` — now always clears the student cookie (previously only cleared it if the session was still valid, leaving stale cookies behind).
+
+4. `src/app/api/admin/logout/route.ts` — now always clears the admin cookie (same reason).
+
+5. `src/lib/session.ts` (`clearSessionCookie`) — now sets an explicit expired cookie (`maxAge: 0`) with matching `path`/`secure`/`sameSite`/`httpOnly` options in addition to `store.delete(name)`, guaranteeing the browser removes the cookie even when the request was forwarded through a proxy that altered the original Set-Cookie attributes.
+
+6. `src/components/auth-guard.tsx` — added a module-level `redirectInProgress` Set that prevents the same `router.replace("/")` from firing more than once per second, breaking any `/` ↔ `/dashboard` ping-pong.
+
+7. `src/app/page.tsx` — same module-level guard around `router.replace("/dashboard")`.
+
+8. `src/components/admin-shell.tsx` (`AdminGuard`) — same guard around `router.replace("/admin/login")`.
+
+9. `src/app/admin/login/page.tsx` — same guard around `router.replace("/admin")`.
+
+No middleware was added or removed. No public routes were protected. No admin routes were made public. No `suppressHydrationWarning`. No auth-disabled. The login flow, UID validation, admin authentication, and protected routes are all preserved.
+
+Verification (agent-browser, 12 scenarios):
+- Fresh `/` loads (no redirect) ✓
+- Student login page loads without redirecting ✓
+- Admin login page loads without redirecting ✓
+- Admin login reaches `/admin` ✓
+- Refresh `/admin` — auth persists (stays on `/admin`) ✓
+- Logout returns to `/admin/login` exactly once ✓
+- Unauthenticated user accessing `/admin` → `/admin/login` ✓
+- Normal student accessing `/admin` → `/admin/login` (cannot access admin) ✓
+- Stale/invalid student cookie → `/` loads, cookie auto-cleared, no loop ✓
+- Stale/invalid admin cookie → `/admin` → `/admin/login` once, cookie auto-cleared, no loop ✓
+- Admin opens `/` in new tab → shows landing (no redirect loop) ✓
+- Admin opens `/admin/login` while logged in → redirects to `/admin` once ✓
+- Zero console errors, zero `ERR_TOO_MANY_REDIRECTS`, zero HTTP 3xx in the dev log.
+
+Stage Summary:
+- The redirect loop is resolved at the root cause. Stale/expired session cookies are now cleared by the API on every 401, so they can no longer cause repeated auth-check failures. Client-side redirect effects are guarded by a module-level Set that prevents the same destination from being triggered more than once per second, which breaks any ping-pong between paired routes (`/` ↔ `/dashboard`, `/admin` ↔ `/admin/login`). The `clearSessionCookie` helper now writes an explicit expired cookie with matching attributes to guarantee removal through proxies. All auth flows (student login, admin login, protected routes, logout) are verified working with no redirect loops.

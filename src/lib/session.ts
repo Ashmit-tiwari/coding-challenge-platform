@@ -79,7 +79,19 @@ export async function setSessionCookie(
 
 export async function clearSessionCookie(kind: "student" | "admin" = "student") {
   const store = await cookies();
-  store.delete(kind === "admin" ? ADMIN_COOKIE : SESSION_COOKIE);
+  const name = kind === "admin" ? ADMIN_COOKIE : SESSION_COOKIE;
+  // Delete by name (Next.js sets maxAge=0). Also explicitly set an expired
+  // cookie with matching path/secure/sameSite options to guarantee the
+  // browser removes the cookie even if the request was forwarded through
+  // a proxy that altered the original Set-Cookie attributes.
+  store.delete(name);
+  store.set(name, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export async function getSession(kind: "student" | "admin" = "student"): Promise<SessionPayload | null> {
