@@ -617,3 +617,27 @@ Stage Summary:
 - **The platform is fully functional end-to-end and browser-verified.** A student can log in, solve a weekly challenge in a real sandboxed code runner, get XP, streaks, and achievements persisted in the DB, appear on the leaderboard, and customize their avatar — while the admin can securely log in, publish challenges, inspect participants, monitor plagiarism flags, and view analytics. All under audit logging.
 - Admin credentials: username `admin`, password from `ADMIN_PASSWORD` env (set to "Nevermissme" locally; hashed in DB, never in client bundles).
 - Demo students: `26LBCS0001` / `25LBCS0001` etc., password `demo1234`.
+
+---
+Task ID: 11
+Agent: main (Z.ai Code)
+Task: Fix React hydration error (HTML nesting: <a> cannot be a descendant of <a>)
+
+Work Log:
+- Reproduced the hydration error using agent-browser: console showed `In HTML, <a> cannot be a descendant of <a>` with a stack trace pointing to the admin overview page's `StatCard` component.
+- Root cause: `StatCard` wrapped its entire `inner` content (which included a "View" `<Link>` in the CardFooter) inside ANOTHER `<Link href={href}>` — producing `<a><a>` nesting, which is invalid HTML.
+- Fix in `src/app/admin/page.tsx`:
+  - Removed the outer `<Link>` wrapper around `inner`.
+  - Replaced the inner footer "View" `<Link>` with a plain `<span>` (visual only).
+  - Made the whole `<Card>` clickable via `onClick={() => router.push(href)}` using Next.js `useRouter` for client-side navigation (no full page reload).
+  - Added `cursor-pointer` class when `href` is present.
+- Also fixed two `<Link><Button>` patterns (which produce invalid `<a><button>` HTML) using shadcn's `asChild` slot pattern:
+  - `src/app/page.tsx` — admin login button: changed to `<Button asChild><Link>...</Link></Button>`.
+  - `src/app/admin/page.tsx` — "All submissions" button: same fix.
+- Verified all other pages already use the correct `asChild` pattern for link-buttons.
+- **Verification**: cleared cookies + console, navigated through every page (landing, dashboard, challenges, profile, avatar, leaderboard, achievements, certificates, notifications, admin login, admin overview, participants, challenges, submissions, integrity, analytics, audit, settings) — zero hydration errors in the console on any page.
+- `bun run lint` — clean.
+
+Stage Summary:
+- Hydration error is fully resolved. The admin overview StatCards are now clickable via router.push (client-side nav) with a "View" label, and all link-button patterns use the shadcn `asChild` slot to render valid `<a>` elements (no nested interactive elements).
+- All 18 user-facing pages verified hydration-error-free in the browser.

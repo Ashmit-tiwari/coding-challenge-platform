@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -87,6 +88,7 @@ function StatCard({
   href?: string;
   loading?: boolean;
 }) {
+  const router = useRouter();
   const tintMap: Record<string, string> = {
     emerald: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-emerald-500/30",
     amber: "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30",
@@ -114,16 +116,22 @@ function StatCard({
       </CardContent>
       {href && (
         <CardFooter className="pt-0 pb-3">
-          <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
             View <ArrowRight className="h-3 w-3" />
-          </Link>
+          </span>
         </CardFooter>
       )}
     </>
   );
   return (
-    <Card className={cn("border-border/60", href && "transition-shadow hover:shadow-md")}>
-      {href ? <Link href={href} className="block">{inner}</Link> : inner}
+    <Card
+      className={cn(
+        "border-border/60",
+        href && "transition-shadow hover:shadow-md cursor-pointer",
+      )}
+      onClick={href ? () => router.push(href) : undefined}
+    >
+      {inner}
     </Card>
   );
 }
@@ -418,11 +426,11 @@ export default function AdminOverviewPage() {
               </CardTitle>
               <CardDescription className="text-xs">Latest activity across the platform</CardDescription>
             </div>
-            <Link href="/admin/submissions">
-              <Button variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/submissions">
                 All submissions <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto custom-scrollbar max-h-[420px]">

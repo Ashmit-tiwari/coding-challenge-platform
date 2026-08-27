@@ -81,11 +81,11 @@ export default function LandingPage() {
                 {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </button>
             )}
-            <Link href="/admin/login">
-              <Button variant="ghost" size="sm" className="gap-2">
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <Link href="/admin/login">
                 <Lock className="h-4 w-4" /> Admin
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </header>
