@@ -667,3 +667,35 @@ Work Log:
 
 Stage Summary:
 - The `ERR_TOO_MANY_REDIRECTS` is fully resolved. The redirect chain is now driven entirely by `useEffect` (post-render) with one-shot `redirecting` state guards, so a component never fires `router.replace` more than once per navigation. Opening the app in a fresh tab now lands on the correct page based on session state, with no loops regardless of which combination of student/admin cookies is present.
+
+---
+Task ID: 13
+Agent: main (Z.ai Code)
+Task: Fix hydration mismatch on the auth form UID <Input>
+
+Work Log:
+- Reproduced & diagnosed via direct SSR HTML inspection (`curl http://localhost:3000/`) and client DOM inspection (`agent-browser eval document.querySelector('#uid').outerHTML`).
+- Root cause: the custom `Input` component (`src/components/ui/input.tsx`) explicitly forwarded `type={type}` even when the caller did not pass a `type` prop (i.e. `type === undefined`). For the UID field on the auth form (`<Input id="uid" name="uid" placeholder="..." autoComplete="username" required />`) this caused the server to render `<input .../>` with NO `type` attribute at all. The browser then implicitly assigned `type="text"` to the parsed DOM node (the HTML default for `<input>`), and password-manager / autofill browser extensions commonly inject or rewrite the `type` attribute on inputs that have `autoComplete="username"` before React hydrates. The result was the reported hydration warning: "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties", with the diff pointing at the UID `<input>` (CardContent → Tabs → TabsContent → form → Label → Input → <input id="uid" ... autoComplete="username">).
+- Secondary observation (not the root cause, but documented): React 19's server renderer does NOT alias `autoComplete` → `autocomplete` in its server-side `aliases` map (the client hydration code does handle this via `toLowerCase()`), so the SSR HTML emits `autoComplete` (camelCase) literally. The browser normalizes it to `autocomplete` during HTML parsing and React's hydration reconciles the two correctly in a vanilla browser. This is harmless on its own but becomes a mismatch point when a browser extension rewrites attribute casing on autofill fields. The actual fix for the user's reported warning is the `type` attribute fix below.
+
+- Fix applied (minimal, surgical): changed `src/components/ui/input.tsx` so the forwarded `type` is always a concrete value — `type={type ?? "text"}`. This makes the server-rendered HTML include `type="text"` for every text input, which exactly matches the browser's parsed DOM and removes the gap that browser extensions exploit. No `suppressHydrationWarning` was added. No other props (placeholder, id, name, autoComplete, required, className, value, defaultValue, disabled, etc.) were touched. The `autoComplete` React prop continues to be used with the standard camelCase API (using the lowercase form would trigger React's "Invalid DOM property `autocomplete`. Did you mean `autoComplete`?" validation error, so that would be wrong).
+
+- Verification (agent-browser, clean Chromium):
+  - Opened `/` fresh → no hydration warning, no "did not match", no "Invalid DOM property" errors in the console.
+  - `document.querySelector('#uid').placeholder` === "25LBCS0001 or 26LBCS0001" (preserved).
+  - `document.querySelector('#uid').type` === "text" (both the DOM property and the attribute now match the SSR HTML).
+  - `document.querySelector('#uid').getAttribute('autocomplete')` === "username" (functional).
+  - Switched to the Register tab → `#r-uid` placeholder === "26LBCS0134", type === "text". No hydration errors.
+  - Logged in as a freshly registered student `26LBCS1001` (year 1) → navigated to `/dashboard`. No console errors.
+  - Logged in as admin (`admin` / `Nevermissme`) → navigated to `/admin`. No console errors.
+- UID validation untouched: `src/lib/uid.ts` still uses `^(25|26)LBCS\d{4}$` with `.trim().toUpperCase()` before testing. Verified via the API:
+  - `25LBCS3168` (valid second-year format) → password check stage (account exists).
+  - `27LBCS1234` (invalid prefix) → "UID must match the pattern 25LBCSxxxx or 26LBCSxxxx (4 digits)."
+  - `26LBCS1001` (valid first-year format) → registered successfully with `year: "1"`.
+- `bun run lint` — clean.
+
+Files changed:
+- `src/components/ui/input.tsx` (one line: `type={type}` → `type={type ?? "text"}` plus a comment explaining why).
+
+Stage Summary:
+- The hydration mismatch on the auth form UID input is resolved at the application level. The server-rendered HTML and the post-parse DOM are now byte-identical for the `type` attribute on every `<Input>`, which removes the gap that was causing React 19 to flag the UID input as a hydration mismatch (especially in browsers with password-manager extensions that rewrite the input before hydration). The UI, placeholders, `autoComplete`, UID validation regex/format, login flow, and admin login are all preserved.
