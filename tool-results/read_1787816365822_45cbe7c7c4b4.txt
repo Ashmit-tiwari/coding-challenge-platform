@@ -1,0 +1,213 @@
+     1→# Weekly Coding Challenges 2.0 — Worklog
+     2→
+     3→This file tracks the work of all agents building the WCC 2.0 platform.
+     4→Each agent MUST append a new section (starting with `---`) after finishing its task.
+     5→
+     6→---
+     7→Task ID: 1
+     8→Agent: main (Z.ai Code)
+     9→Task: Foundation — deps, next.config, Prisma schema, db push, lib utilities, seed
+    10→
+    11→Work Log:
+    12→- Installed `bcryptjs` + types for salted password hashing.
+    13→- Updated `next.config.ts` with `allowedDevOrigins` and remote image patterns.
+    14→- Wrote full Prisma schema at `prisma/schema.prisma`: User, AdminUser, Avatar, Challenge, TestCase, Submission, XpTransaction, LevelDef, Achievement, UserAchievement, Certificate, LeaderboardSnapshot, WeeklyWinner, Notification, ActivityLog, AuditLog, PlagiarismFlag, PlatformSetting.
+    15→- Ran `bun run db:push` to sync SQLite database at `db/custom.db`.
+    16→- Created lib utilities:
+    17→  - `src/lib/password.ts` — bcrypt hash/verify + safe-equal.
+    18→  - `src/lib/uid.ts` — UID regex/parsing (25/26LBCSxxxx), batch→year mapping, extensible.
+    19→  - `src/lib/session.ts` — HMAC-signed httpOnly cookie session tokens (student + admin), no JWT lib.
+    20→  - `src/lib/progression.ts` — 9 level tiers (Beginner→Pro), streak recomputation from ActivityLog solve dates, XP rules per difficulty + first-attempt bonus.
+    21→  - `src/lib/achievements.ts` — backend achievement evaluator (idempotent), certificate issuer tied to solves+level.
+    22→  - `src/lib/similarity.ts` — code plagiarism engine (token/whitespace/identifier/structural normalization, Jaccard + edit distance).
+    23→- Wrote seed script `prisma/seed.ts` and added `db:seed` script to package.json.
+    24→- Seeded: 1 superadmin (creds from env ADMIN_PASSWORD, hashed), 9 LevelDefs, 22 AchievementDefs, platform settings, 13 sample challenges (each with sample+hidden test cases, starter code for python/cpp/js), 4 demo students (2 first-year 26LBCS, 2 second-year 25LBCS) with starter XP.
+    25→- Created `.env` and `.env.example` (admin password NOT in client bundles; `.env*` is gitignored).
+    26→
+    27→Stage Summary:
+    28→- Database fully provisioned with rich seed data.
+    29→- Admin login: username `admin`, password from env (set to "Nevermissme" in local .env only — hashed in DB).
+    30→- Demo students: `26LBCS0001`/`25LBCS0001` etc., password `demo1234`.
+    31→- 13 published challenges across Python, Algorithms, DSA, SQL, AI/ML categories with Easy/Medium difficulties.
+    32→- Foundation ready for API + frontend work. Code execution handled by a separate mini-service (Task 3).
+    33→
+    34→---
+    35→Task ID: 3
+    36→Agent: main (Z.ai Code)
+    37→Task: Code execution mini-service (sandboxed Python/C++/JS runner)
+    38→
+    39→Work Log:
+    40→- Created `mini-services/exec-service/` as an independent Bun project on port 3031.
+    41→- Implemented `index.ts` with a `/run` and `/health` HTTP endpoint (CORS-enabled).
+    42→- Each language runner writes code to an ephemeral temp dir under os.tmpdir() with mode 0600, runs in a short-lived subprocess, then deletes the dir.
+    43→- Hard wall-clock + CPU limits enforced via setTimeout SIGKILL fallback; configurable timeLimitMs (clamped 200ms..15s) and memoryLimitMb.
+    44→- Languages:
+    45→  - python → `python3 -I main.py` (isolated mode, unbuffered).
+    46→  - javascript → `node --no-warnings main.js`.
+    47→  - cpp → `g++ -O2 -std=c++17` then run the binary (compile step has its own 8s limit).
+    48→- Status mapping: Accepted / Wrong Answer / Compilation Error / Runtime Error / Time Limit Exceeded / Internal Error.
+    49→- Answer checking normalizes line endings and strips trailing whitespace/newlines.
+    50→- Verified working with live curl tests for all three languages (Python, C++, JavaScript).
+    51→- Service runs in background via `bun index.ts` (not --hot for stability during dev); restart manually if needed.
+    52→
+    53→Stage Summary:
+    54→- Exec service is live on port 3031 and ready to receive code execution requests from the Next.js submission API.
+    55→- All requests go through Caddy gateway via `?XTransformPort=3031` from the frontend, or direct localhost from Next.js server-side.
+    56→
+    57→---
+    58→Task ID: 2
+    59→Agent: main (Z.ai Code)
+    60→Task: Backend APIs — auth, challenges, submissions, profile, leaderboard, achievements, certificates, notifications, admin
+    61→
+    62→Work Log:
+    63→- Created `src/lib/api.ts` (response helpers + publicUser/publicChallenge serializers + safeJson).
+    64→- Created `src/lib/admin.ts` (requireAdmin guard + writeAudit).
+    65→- Student auth:
+    66→  - `POST /api/auth/register` — UID-validated registration, derives year/batch from prefix, creates default avatar, sends welcome notification.
+    67→  - `POST /api/auth/login` — bcrypt verify, ban check, sets httpOnly signed session cookie.
+    68→  - `POST /api/auth/logout` — clears student+admin cookies.
+    69→  - `GET /api/auth/me` — current user, recomputes streak + level tier.
+    70→- Challenges:
+    71→  - `GET /api/challenges` — filter by difficulty/category/year/status/q/weekly, includes user solved/attempted state.
+    72→  - `GET /api/challenges/[slug]` — full detail; students see sample tests + hidden count, admins see all.
+    73→  - `GET /api/challenges/weekly` — current weekly challenge + participation count.
+    74→- Submissions:
+    75→  - `POST /api/submissions` — runs code against ALL test cases via exec mini-service (port 3031). Records attempt. Idempotent XP award (only FIRST solve earns base XP + 25% first-attempt bonus). Streak recompute from ActivityLog. Achievement + certificate evaluation. Plagiarism scan vs other submissions on same challenge. Rate-limited (8/min/user). Returns per-test results, XP breakdown, level-up signal, unlocked achievements + certs.
+    76→  - `GET /api/submissions` — current user's submission history.
+    77→- Profile:
+    78→  - `GET /api/profile?uid=` — full public profile: stats, achievements, certificates, recent submissions, timeline, contribution calendar.
+    79→  - `PATCH /api/profile` — update bio/username/featured badges (validates badge ownership).
+    80→  - `GET/PUT /api/profile/avatar` — avatar catalog + sanitized config store.
+    81→- Leaderboard:
+    82→  - `GET /api/leaderboard?scope=overall|year1|year2&period=all|weekly|monthly` — ranked users, distinct solved counts, achievement badges, my-movement, hall of fame.
+    83→- Achievements:
+    84→  - `GET /api/achievements` — all achievements + unlock state + live progress for own profile.
+    85→  - `POST /api/achievements/evaluate` — manual re-check.
+    86→- Certificates:
+    87→  - `GET /api/certificates` — list for a user.
+    88→  - `POST /api/certificates` — try to issue (backend enforces eligibility, prevents unearned certs).
+    89→- Notifications:
+    90→  - `GET /api/notifications` + `POST /api/notifications/read`.
+    91→- Dashboard:
+    92→  - `GET /api/dashboard` — aggregate (stats, level info, weekly, contribution calendar, recent activity/submissions/achievements).
+    93→- Admin:
+    94→  - `POST /api/admin/login` — verifies against DB-hashed admin password (Nevermissme only in local .env, never in client bundles).
+    95→  - `GET /api/admin/session`, `POST /api/admin/logout`.
+    96→  - `GET /api/admin/dashboard` — full platform overview metrics.
+    97→  - `GET /api/admin/participants` + `GET/PATCH /api/admin/participants/[id]` — search/filter/ban/XP adjust.
+    98→  - `GET/POST /api/admin/challenges` + `GET/PATCH/DELETE /api/admin/challenges/[id]` — full challenge CRUD with test cases.
+    99→  - `GET /api/admin/submissions` + `GET /api/admin/submissions/[id]` — submission inspection (audit logged).
+   100→  - `GET /api/admin/integrity` + `PATCH /api/admin/integrity/[id]` + `GET /api/admin/integrity/compare/[pairId]` + `POST /api/admin/integrity/recompute` — plagiarism review + side-by-side compare + manual rescan.
+   101→  - `GET /api/admin/analytics` — year1 vs year2 participation, submissions, accepted, solved, per-challenge performance, 14-day time series.
+   102→  - `GET/PUT /api/admin/settings` — platform configuration (languages, categories, difficulties, thresholds, announcements).
+   103→  - `GET /api/admin/audit` — audit log viewer.
+   104→
+   105→Stage Summary:
+   106→- Complete REST API layer over the Prisma/SQLite database. All student + admin endpoints are implemented and secured by signed httpOnly session cookies with role separation.
+   107→- Submission flow is the platform core: exec-service → idempotent XP → streak → achievements → certificates → plagiarism scan, all transactionally-minded.
+   108→- Plagiarism engine writes PlagiarismFlag rows when similarity ≥ 0.7; admin can review/dismiss/confirm + compare side by side.
+   109→- Audit log captures: admin_login, challenge_create/edit/delete, view_submission, user_ban/unban, flag_review, settings_update, integrity_recompute.
+   110→- Dev server running on port 3000; exec service on port 3031. Ready for frontend integration.
+   111→
+   112→---
+   113→Task ID: 5
+   114→Agent: subagent-dash
+   115→Task: Student dashboard page at `src/app/dashboard/page.tsx` (Next.js 16 App Router, client component)
+   116→
+   117→Work Log:
+   118→- Read `/home/z/my-project/worklog.md` to understand prior work (Task 1 foundation, Task 2 backend APIs incl. `GET /api/dashboard`, Task 3 exec mini-service).
+   119→- Read existing scaffolding before writing: `auth-guard.tsx`, `student-shell.tsx`, `avatar-svg.tsx`, `lib/store.ts` (`useAuth`), `lib/progression.ts` (`computeLevelInfo`, level tier color hex values), `lib/utils.ts` (`cn`), `lib/api.ts`, `components/ui/*` (Card, Button, Badge, Progress, Skeleton, Tooltip, Table), `globals.css` (brand utilities `brand-gradient` / `text-brand-gradient` / `custom-scrollbar`), `package.json` (confirmed `framer-motion` ^12, `date-fns` ^4, `lucide-react` ^0.525, `sonner` ^2).
+   120→- Inspected `prisma/schema.prisma` to confirm ActivityLog `type` values (`submission | solve | achievement | certificate | level_up`), Submission `status` values, Achievement `rarity` + `icon` (lucide name string) fields, and Challenge weekly `weekStartsAt`/`weekEndsAt` `DateTime?` columns.
+   121→- Inspected `prisma/seed.ts` for the seeded Achievement icon-name list (Code2, CheckCircle2, Zap, Sparkles, ShieldCheck, Trophy, Award, Crown, Flame, Gauge, Bug, Calendar, Hammer, Medal, Binary, Mountain, Star, Code) and built a string→LucideIcon resolver (`ACHIEVEMENT_ICONS`) for the achievements strip.
+   122→- Created `src/app/dashboard/page.tsx` (single client component file ~880 lines). Sections:
+   123→  1. `AuthGuard` wrapper around `DashboardContent` (per the spec — `student-shell.tsx` is auto-applied by AuthGuard).
+   124→  2. Data fetch: `useEffect` + `useState` → `GET /api/dashboard` with `cache: "no-store"`, `try/catch` + `toast.error` from `sonner` on failure, abort flag to prevent setState after unmount.
+   125→  3. Hero card — large 88px `AvatarSvg` (ring-4 ring-primary/10), name, year badge (`First Year` / `Second Year`), UID mono, level tier with inline-style color from `levelInfo.color`, XP total with Zap icon, current streak with Flame, and `Progress` bar with "X XP to next level" / "X / Y XP this level" labels. Shows "Max tier reached" when `maxXp === null`.
+   126→  4. Stats grid (4 cards, `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`): Solved (CheckCircle2 / emerald), Attempts (Zap / amber), Success Rate % (Target / primary), Longest Streak (Flame / rose). Each card has a colored blur accent and an icon tile.
+   127→  5. Welcome aboard card — shown only when `stats.solvedCount === 0`. Brand-gradient header, 4-tip grid (first solve, streak, leaderboard, achievements), CTAs to `/challenges` and `/leaderboard`.
+   128→  6. Weekly spotlight — prominent card. Brand-gradient icon, week label, difficulty + category + XP badges (using `difficultyColor` helper). Three stat tiles (Time left with `useCountdown` ticking every 1s formatted "Xd Yh Zm", Participation count, Your status = Not attempted / Attempted / Solved). CTA "Open challenge" → `/challenges/{slug}` (or "Review solution" if solved). Empty state when `weekly === null`.
+   129→  7. Contribution calendar — 52-week GitHub-style grid (Monday-start, ending today). Computed with `useMemo` from today's date. Cells colored: 0=bg-muted, 1=emerald-200, 2=emerald-400, 3+=emerald-600 (with dark-mode variants). Month labels along top (only on week columns where month changes), Mon/Wed/Fri weekday labels along left. Hover tooltip on each cell ("N submissions · YYYY-MM-DD"). Legend "Less ◻◻◻◼ More". Horizontally scrollable (`overflow-x-auto custom-scrollbar`) on mobile. Empty state shows "Start your first challenge to light up the grid!" when active-day count = 0. Card title shows total active days.
+   130→  8. Recent submissions — `lg:col-span-2` shadcn Table. Columns: Challenge (linked to `/challenges/{slug}` with difficulty + category badges), Lang (mono uppercase badge), Status (color-coded badge: Accepted=emerald, Wrong Answer=amber, Compile/Runtime Error=rose, TLE/MLE=orange, Internal=slate; with CheckCircle2 prefix on success), Attempt #, XP awarded (+N green / — muted), relative time. Empty state with CTA. Capped at 8 rows.
+   131→  9. Recent activity timeline — `lg:col-span-1` vertical timeline. Absolute positioned vertical line (`left-[15px]`), 8x8 circular icon markers per type (submission=sky/Code2, solve=emerald/CheckCircle2, achievement=amber/Award, certificate=violet/Medal, level_up=primary/TrendingUp, default=muted/Activity). Each entry shows description + relative time using `date-fns formatDistanceToNowStrict`. Capped at 8, `max-h-96 overflow-y-auto custom-scrollbar`. Empty state: "Your activity will appear here once you start submitting."
+   132→  10. Recent achievements — horizontal scroll strip. Each badge is a 96-112px card with a circular icon (by rarity: common=slate, rare=emerald, epic=amber, legendary=rose+gradient), name (line-clamped), rarity label. Hover `Tooltip` shows name + description + rarity + XP reward + relative time. "View all" link to `/achievements`. Empty state: "Solve your first challenge to start unlocking achievements."
+   133→  11. Loading skeleton — `DashboardSkeleton` renders full skeleton placeholders for every section (hero, stats grid, weekly, calendar grid 7×30 cells, submissions list, activity timeline, achievements strip) while `loading || !data`.
+   134→- Subtle `framer-motion` `motion.div` fade-in (`opacity:0 y:8 → opacity:1 y:0`, 0.3s with staggered delays 0..0.2s) wraps each major section. Single TooltipProvider at the root.
+   135→- Helpers added: `difficultyColor(d)` (Easy=emerald, Medium=amber, Hard=rose, Expert=violet), `submissionStatusColor(s)`, `relativeTime(iso)`, `yearLabel(year)`, `useCountdown(target)` (ticks every 1s, displays "Xd Yh Zm"), `activityIcon(type)`, `rarityStyles(rarity)`, `ymdLocal(d)`, `contributionColor(count)`.
+   136→- Responsive: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` for stats; `grid-cols-1 lg:grid-cols-3` for submissions+activity (with submissions taking `lg:col-span-2`); cards use `p-4 sm:p-6`; gaps use `gap-4 sm:gap-6`. Weekly spotlight stat tiles collapse `col-span-2 sm:col-span-1` on mobile. Table hides Lang/Attempt/When columns on small screens (`hidden sm:table-cell`, `hidden md:table-cell`).
+   137→- Lint check: `npx eslint src/app/dashboard/page.tsx` passes with no errors. Pre-existing lint errors in `auth-guard.tsx:15` and `student-shell.tsx:35` (React 19 `react-hooks/set-state-in-effect` rule, set up by Task 2) are NOT modified — left for the owner of those files.
+   138→- Dev server verification: `curl http://localhost:3000/dashboard` → HTTP 200, log line `○ Compiling /dashboard ... GET /dashboard 200 in 5.6s (compile: 5.4s, render: 164ms)` with no errors or warnings. Page compiles cleanly under Next.js 16.
+   139→- Only the single file `src/app/dashboard/page.tsx` was created. No new API routes, no tests, no DB schema changes.
+   140→
+   141→Stage Summary:
+   142→- Student dashboard is live at `/dashboard` (gated by AuthGuard → redirects to `/` when logged out).
+   143→- Renders a complete overview: hero with avatar/level/XP/streak/progress, 4 stat cards, optional welcome-aboard onboarding card, weekly challenge spotlight with live countdown and participation count, a 52-week contribution calendar with month/weekday labels + legend, recent submissions table, vertical recent-activity timeline, and a horizontally-scrollable recent-achievements strip.
+   144→- Uses the established brand palette (emerald `--brand` + amber accent, `brand-gradient` utility) and existing shadcn/ui New York components — no indigo/blue introduced except the data-driven level-tier color from the backend (Intermediate=#0ea5e9) which is rendered via inline style as required by the spec.
+   145→- All sections have skeleton loading states and friendly empty states. Subtle framer-motion fade-ins on mount. Fully responsive (mobile-first). Accessible: semantic landmarks via StudentShell, ARIA labels on avatars/icons, keyboard-focusable links/buttons, sr-only-tooltip via radix Tooltip.
+   146→- Pre-existing lint issues in `auth-guard.tsx` and `student-shell.tsx` (set-state-in-effect under React 19 lint rules) are noted but not patched — out of scope for this task.
+   147→- Dashboard is ready for the user to preview via the Preview Panel; demo login `26LBCS0001` / `demo1234` will land here after auth.
+   148→
+   149→---
+   150→Task ID: 6
+   151→Agent: subagent-profile
+   152→Task: Student profile page (`src/app/profile/page.tsx`) + Avatar builder page (`src/app/profile/avatar/page.tsx`) — Next.js 16 App Router, client components
+   153→
+   154→Work Log:
+   155→- Read `/home/z/my-project/worklog.md` to absorb prior work (Task 1 foundation + Prisma schema, Task 2 backend APIs incl. `GET /api/profile?uid=`, `GET/PUT /api/profile/avatar`, `GET /api/achievements?uid=`, Task 3 exec mini-service, Task 5 dashboard page).
+   156→- Read existing scaffolding before writing: `auth-guard.tsx`, `student-shell.tsx`, `avatar-svg.tsx`, `lib/store.ts` (`useAuth`, `refreshStudent`), `lib/api.ts` (`publicUser`), `lib/progression.ts` (`computeLevelInfo`, `LevelInfo`), `lib/utils.ts` (`cn`), `package.json` (confirmed `framer-motion` ^12, `recharts` ^2.15, `date-fns` ^4, `lucide-react` ^0.525, `sonner` ^2), `components/ui/*` (Card, Button, Badge, Progress, Skeleton, Tooltip, Table, Dialog, Input, Textarea, Label, Checkbox, Tabs), and `globals.css` (brand utilities `brand-gradient` / `text-brand-gradient` / `custom-scrollbar`).
+   157→- Inspected the API route files (`src/app/api/profile/route.ts`, `src/app/api/profile/avatar/route.ts`, `src/app/api/achievements/route.ts`, `src/app/api/certificates/route.ts`) and `prisma/schema.prisma` `Certificate` model to confirm exact response shapes and field names (certId, tierLevel, level, issuedAt, studentName, studentUid, year, isOwn flag, contributionCalendar `Record<string, number>`).
+   158→- Re-used dashboard conventions for consistency: `difficultyColor`, `submissionStatusColor`, `rarityStyles`, `activityIcon`, `ymdLocal`, `contributionColor`, MONTHS_SHORT, WEEKDAY_LABELS, `ACHIEVEMENT_ICONS` (string → LucideIcon resolver), 52-week GitHub-style `ContributionCalendar` component, yearLabel helper.
+   159→
+   160→### `src/app/profile/page.tsx` (single client component file ~1300 lines)
+   161→- Default export wraps `AuthGuard` around a `Suspense` boundary (required by `useSearchParams()` in Next.js 16) containing `ProfileContent`.
+   162→- `ProfileContent`:
+   163→  - Reads `?uid=` from `useSearchParams()`; falls back to current user when omitted.
+   164→  - Fetches `/api/profile?uid=...` and (in parallel) `/api/achievements?uid=...` for the FULL achievement list (locked + unlocked + live progress). Falls back to profile-only achievements on error.
+   165→  - `useCallback`-wrapped `fetchProfile` re-used by Edit/Featured-badge dialogs after save so the page refreshes in place.
+   166→  - Scrolls to top when `uid` changes.
+   167→- Sections rendered (in order):
+   168→  1. **HeaderCard** — large 128px `AvatarSvg` (ring-4 ring-primary/10), name, year badge, banned badge (when applicable), UID mono, `@username` handle, bio (or italic placeholder for own profile), inline `levelInfo.color`-coloured tier pill, XP total (Sparkles), current streak (Flame), longest streak (Trophy), member-since date (parseISO + format). Level progress bar with "X / Y XP this level" and "X XP to next level" labels (or "Max tier reached" when maxXp is null). If `isOwn`: "Edit profile" + "Customize avatar" buttons. Edit dialog uses `Dialog` + `Input` + `Textarea` (500 char limit, with live counter) + `Label`, PATCHes `/api/profile` with `{ bio, username }`, calls `refreshStudent()` via parent on success.
+   169→  2. **Stats grid** (6 cards, `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`): Solved, Attempts, Success rate, XP, Achievements (count of unlocked), Certificates. Each card has a colored gradient blur accent + an icon tile (emerald/amber/primary/violet).
+   170→  3. **FeaturedBadges** — renders `featuredBadges` (achievement keys) as a wrap of circular-icon cards with rarity ring (common=slate, rare=emerald, epic=amber, legendary=rose gradient), name, rarity label, hover Tooltip (name + description + XP + unlock date). If `isOwn`: "Select badges" button opens a Dialog with a checkbox grid of all unlocked achievements, max 6 enforced, PATCHes `/api/profile` with `{ featuredBadges }` on save. Empty state for no-unlocks-yet and no-featured-yet cases.
+   171→  4. **ContributionCalendar** (xl:col-span-2 of a 3-col grid) — 52-week GitHub-style grid (Monday-start, ending today). Computed with `useMemo` from today's date. Cells coloured by solve count (0=bg-muted, 1=emerald-200, 2=emerald-400, 3+=emerald-600, with dark-mode variants). Month labels along top (only on week columns where month changes), Mon/Wed/Fri weekday labels along left. Hover Tooltip per cell ("N submissions · YYYY-MM-DD"). Legend "Less ◻◻◻◼ More". Horizontally scrollable on mobile. Empty state when active-day count = 0 (different copy for own vs others).
+   172→  5. **PerformanceChart** (xl:col-span-1) — recharts `BarChart` of submissions per week over the last 12 weeks (Mon-start buckets). Each bar is colored `var(--brand)` if at least one solve in that week, else a lighter brand tint. Uses `ResponsiveContainer` h-[240px], `XAxis` (week label), `YAxis` (allowDecimals=false), `RTooltip` with `var(--background)` styling. Empty state when no submissions.
+   173→  6. **AchievementsSection** — full grid (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`) of all achievements (unlocked + locked). Sorted: unlocked first, then by rarity weight (legendary→common), then by name. Each card: rarity-coloured ring icon (or grayscale + Lock badge for locked), name, rarity + XP reward, description (line-clamped-2), and one of: unlock-date with CheckCircle2 (unlocked), progress bar + "current / needed" with metric label (locked + own + progress available), or "In progress — keep going!" / "Locked" with Lock icon (otherwise).
+   174→  7. **CertificatesSection** — `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` of certificate cards. Each card: level badge (primary), tier mono, student name, student UID mono, issue date (parseISO + format), cert id mono, "View / Download" button linking to `/certificates?uid=...&cert=...` (the certificates page — to be built by a later agent — will handle the printable view). Branded gradient card background with blur accent. Empty state with ScrollText icon.
+   175→  8. **TimelineSection** (lg:col-span-1) — vertical timeline of `timeline` entries. Absolute positioned vertical line, 8x8 circular icon markers per type (submission=sky/Code2, solve=emerald/CheckCircle2, achievement=amber/Award, certificate=violet/Medal, level_up=primary/TrendingUp). Each entry: description + relative time (date-fns formatDistanceToNowStrict). Capped at 30 rows, scrollable (`max-h-[28rem] overflow-y-auto custom-scrollbar`). Empty state.
+   176→  9. **ChallengeHistory** (lg:col-span-2) — shadcn Table of `submissions`. Columns: Challenge (linked to `/challenges/{slug}` with difficulty + category badges), Status (color-coded badge with CheckCircle2 prefix on success), Lang (mono uppercase), Attempt #, XP awarded (+N green / — muted), relative time. Filter chips (All / Passed / Failed) above the table. Capped at 50 rows. Responsive: hides Status/Lang/Attempt/When columns on small screens. Empty state.
+   177→- Subtle `framer-motion` `motion.div` fade-ins (`opacity:0 y:8 → opacity:1 y:0`, 0.3s with staggered delays 0..0.22s) on every major section. Single TooltipProvider at the root.
+   178→- Loading skeleton (`ProfileSkeleton`) renders full skeleton placeholders for every section.
+   179→- Fixed a subtle Radix Checkbox API issue: removed the (incorrect) `onChange` prop (Radix Checkbox uses `onCheckedChange`) — kept the Checkbox purely visual via `pointer-events-none` + `tabIndex={-1}` + `aria-hidden`, with the parent button's `onClick` doing the actual toggle.
+   180→
+   181→### `src/app/profile/avatar/page.tsx` (single client component file ~600 lines)
+   182→- Default export wraps `AuthGuard` around `AvatarBuilder`.
+   183→- `AvatarBuilder`:
+   184→  - Fetches `GET /api/profile/avatar` on mount for the current avatar config + the catalog (which is the source of truth for available options). Merges with `DEFAULT_CONFIG` to ensure every category has a value.
+   185→  - `useAuth()` for the student name/uid (shown in the preview) and `refreshStudent()` to sync the global store's avatar after save (so the header avatar updates too).
+   186→  - `dirty` flag computed via `useMemo` over config vs. savedConfig; rendered as a pulsing amber "Unsaved changes" badge in the header.
+   187→  - "Reset" button restores `DEFAULT_CONFIG`. "Randomize" picks one option per category from the catalog at random. "Save avatar" PUTs the config to `/api/profile/avatar`, syncs `savedConfig` to the server-sanitised result, calls `refreshStudent()`, toasts success. Save button is disabled when not dirty.
+   188→- Two-column layout (lg:grid-cols-5):
+   189→  - **Left (col-span-2): live preview** — 240px `AvatarSvg` on a soft `from-primary/10 via-accent/5` gradient card with two blurred color accents, the student's name + UID below the avatar. Includes a "View profile" link and a "Save changes" / "Saved" button for convenience.
+   190→  - **Right (col-span-3): category tabs/panels** — `Tabs` with 12 triggers (Presentation, Skin, Face, Hairstyle, Eyes, Eyebrows, Glasses, Facial hair, Outfit, Outfit vibe, Sticker, Expression). Each trigger has an icon + label and wraps on small screens. Each `TabsContent` renders an `OptionGrid` for that category.
+   191→- `OptionGrid`:
+   192→  - `grid-cols-2 sm:grid-cols-3 md:grid-cols-4` of option chips. Each chip is a button with hover lift, ring-1 ring-primary/40 + bg-primary/5 + check badge when selected.
+   193→  - Each chip renders an `OptionSwatch` (visual preview) + a friendly label (from `OPTION_LABELS` map) and is wrapped in a Tooltip.
+   194→- `OptionSwatch`:
+   195→  - For `skin` → colored circle (mirror of avatar-svg `SKIN_COLORS`).
+   196→  - For `hair` → hair-colored gradient ring with skin-tone center (mirror of avatar-svg `HAIR_COLORS`).
+   197→  - For `outfitVibe` → outfit-color gradient swatch (mirror of avatar-svg `outfitColors`).
+   198→  - For all shape categories (gender, face, hair-shape, eyes, eyebrows, glasses, facial, outfit, sticker, expression) → a tiny 56px `AvatarSvg` preview with that single option applied to a sensible base (DEFAULT_CONFIG merged with current picks), so the user sees what each option looks like in isolation.
+   199→- Catalog options are rendered dynamically from the API response (no hardcoded option lists in the UI — only the friendly label map and color swatch maps are mirrored locally to match avatar-svg's renderer).
+   200→- Loading skeleton (`AvatarBuilderSkeleton`) for both columns.
+   201→- Subtle `framer-motion` fade-ins on the header and both columns.
+   202→
+   203→### Verification
+   204→- `npx eslint src/app/profile/page.tsx src/app/profile/avatar/page.tsx` — passes cleanly with no errors or warnings. The only remaining project-wide lint errors are the pre-existing `react-hooks/set-state-in-effect` issues in `auth-guard.tsx:15` and `student-shell.tsx:35` (set up by Task 2, noted by Task 5) — not in scope for this task.
+   205→- Dev server: `curl http://localhost:3000/profile` → HTTP 200 (`Compiling /profile ... GET /profile 200 in 5.6s (compile: 5.4s, render: 251ms)`). `curl http://localhost:3000/profile/avatar` → HTTP 200 (`GET /profile/avatar 200 in 1006ms (compile: 946ms, render: 61ms)`). Subsequent cached renders return in ~50ms. No errors or warnings in `dev.log`. The server-rendered HTML shows the `AuthGuard` loading state (expected — session cookies aren't set for an unauthenticated curl); the actual profile content renders client-side after the session check, just like the dashboard.
+   206→- Both files are single client components. No new API routes, no DB schema changes, no new shadcn components, no tests.
+   207→
+   208→Stage Summary:
+   209→- Two new pages live and gated by `AuthGuard`:
+   210→  - `/profile` — full coding identity: large header with avatar/name/level/XP/streak/bio + Edit dialog, 6-card stats grid, featured-badges row with selection dialog (max 6 from unlocked), 52-week contribution calendar, 12-week submissions-per-week bar chart (recharts), full achievements grid (locked shown dimmed with Lock + live progress bar for own profile), certificates section linking to the printable certificates page, vertical activity timeline, and filterable challenge-history table. All sections have skeleton loading states, friendly empty states, and staggered framer-motion fade-ins. Responsive (mobile-first, 2–3–4–6 cols at different breakpoints). Uses the established brand palette (emerald `--brand`, amber accent, rarity colors); no indigo/blue.
+   211→  - `/profile/avatar` — Bitmoji-style avatar builder: live 240px preview on the left, 12 category tabs on the right, each rendering a grid of option chips. Color swatches for skin/hair/outfit-vibe; tiny 56px `AvatarSvg` previews for shape categories. Randomize, Reset, Save buttons with an "Unsaved changes" pulse indicator. Save PUTs to `/api/profile/avatar` and syncs the global auth store so the header avatar updates instantly. Catalog options come from the API (no hardcoding).
+   212→- Ready for the user to preview via the Preview Panel; demo login `26LBCS0001` / `demo1234` reaches the dashboard, then nav → Profile / Customize Avatar.
+   213→

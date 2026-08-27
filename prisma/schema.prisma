@@ -1,0 +1,336 @@
+// Weekly Coding Challenges 2.0 — Prisma schema
+// Provider: SQLite (portable to PostgreSQL later; JSON stored as TEXT via Json helpers)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Authentication & users
+// ---------------------------------------------------------------------------
+
+// Student account — identified by university UID (25LBCSxxxx / 26LBCSxxxx)
+model User {
+  id            String   @id @default(cuid())
+  uid           String   @unique // university ID, e.g. 25LBCS0134
+  name          String
+  year          String   // "1" | "2" (derived from UID prefix: 25->2, 26->1)
+  batch         String   // "2025" | "2026" (the leading two digits of UID)
+  username      String?  // optional display handle
+  email         String?
+  passwordHash  String
+  bio           String?
+  xp            Int      @default(0)
+  level         Int      @default(1)
+  levelName     String   @default("Beginner")
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastActiveDate String?  // YYYY-MM-DD of last successful submission
+  titles        String   @default("[]") // JSON array of earned titles
+  featuredBadges String  @default("[]") // JSON array of achievement keys shown on profile
+  isAdmin       Boolean  @default(false)
+  isBanned      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  avatar        Avatar?
+  submissions   Submission[]
+  achievements  UserAchievement[]
+  certificates  Certificate[]
+  notifications Notification[]
+  xpTransactions XpTransaction[]
+  activityLogs  ActivityLog[]
+  weeklyWins    WeeklyWinner[]
+}
+
+// Separate admin credentials store — admin password NEVER lives in client code.
+// Admin users reference a User row (isAdmin=true) OR can be standalone.
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("admin") // "superadmin" | "admin"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs     AuditLog[]
+  reviewedFlags PlagiarismFlag[] @relation("FlagAdminReviewer")
+}
+
+// ---------------------------------------------------------------------------
+// Avatar system
+// ---------------------------------------------------------------------------
+
+model Avatar {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // JSON object of customization selections across categories
+  config        String   @default("{}")
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Challenges & test cases
+// ---------------------------------------------------------------------------
+
+model Challenge {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  statement     String   // markdown problem statement
+  description   String?  // short description for cards
+  difficulty    String   // "Easy" | "Medium" | "Hard" | "Expert"
+  category      String   // "Python" | "C++" | "DSA" | "SQL" | "AI/ML" | "Algorithms"
+  topic         String?
+  xpReward      Int      @default(10)
+  targetYear    String?  // null = all, "1", "2"
+  status        String   @default("draft") // "draft" | "published" | "archived"
+  isWeekly      Boolean  @default(false)
+  weekLabel     String?  // e.g. "Week 12"
+  weekStartsAt  DateTime?
+  weekEndsAt    DateTime?
+  timeLimitMs   Int      @default(2000)
+  memoryLimitMb Int      @default(256)
+  languages     String   @default("[]") // JSON array of supported languages
+  constraints   String?  // markdown
+  examples      String   @default("[]") // JSON array of {input, output, explanation}
+  inputFormat   String?
+  outputFormat  String?
+  starterCode   String   @default("{}") // JSON map lang -> starter code
+  solutionRef   String?  // reference solution for admin
+  version       Int      @default(1)
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  testCases     TestCase[]
+  submissions   Submission[]
+}
+
+model TestCase {
+  id           String   @id @default(cuid())
+  challengeId  String
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name         String
+  input        String
+  expectedOutput String
+  isHidden     Boolean  @default(true)
+  isSample     Boolean  @default(false)
+  scoreWeight  Int      @default(1)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Submissions
+// ---------------------------------------------------------------------------
+
+model Submission {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId   String
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  language      String   // "python" | "cpp" | "javascript"
+  code          String
+  status        String   // "Accepted" | "Wrong Answer" | "Compilation Error" | "Runtime Error" | "Time Limit Exceeded" | "Memory Limit Exceeded" | "Internal Error"
+  passedAll     Boolean  @default(false)
+  passedCount   Int      @default(0)
+  totalTests    Int      @default(0)
+  attemptNumber Int      @default(1)
+  execTimeMs    Int      @default(0)
+  execMemoryKb  Int      @default(0)
+  isFinal       Boolean  @default(false) // final successful solution for this challenge
+  runtimeDetail String?  // JSON detail of each test case result
+  fingerprint   String?  // normalized token fingerprint for similarity
+  createdAt     DateTime @default(now())
+
+  // first successful submission for this (user,challenge) awarded primary XP
+  xpAwarded     Int      @default(0)
+  firstAttempt  Boolean  @default(false) // true if solved on first attempt
+
+  plagiarismA   PlagiarismFlag[] @relation("FlagSubA")
+  plagiarismB   PlagiarismFlag[] @relation("FlagSubB")
+
+  @@index([userId, challengeId])
+  @@index([challengeId])
+  @@index([fingerprint])
+}
+
+// ---------------------------------------------------------------------------
+// XP, Levels, Achievements, Certificates, Streaks
+// ---------------------------------------------------------------------------
+
+model XpTransaction {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Int
+  reason       String   // "challenge_solve" | "first_attempt" | "milestone" | "admin_adjust"
+  refId        String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LevelDef {
+  id           String   @id @default(cuid())
+  tier         String   // "Beginner" | "Intermediate" | "Advanced" | "Pro"
+  level        Int      @unique
+  minXp        Int
+  maxXp        Int?     // null = upper bound
+  color        String   @default("#16a34a")
+  description  String?
+}
+
+model Achievement {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  name          String
+  description   String
+  rarity        String   @default("common") // common | rare | epic | legendary
+  icon          String   // lucide icon name
+  category      String   // "milestone" | "streak" | "speed" | "skill" | "consistency"
+  condition     String   // JSON describing unlock condition (evaluated server-side)
+  xpReward      Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  unlocks       UserAchievement[]
+}
+
+model UserAchievement {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement  Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt   DateTime @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model Certificate {
+  id           String   @id @default(cuid())
+  certId       String   @unique // public verification id
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level        String   // "Beginner" | "Intermediate" | "Advanced" | "Pro"
+  tierLevel    Int
+  issuedAt     DateTime @default(now())
+  studentName  String
+  studentUid   String
+  year         String
+
+  @@unique([userId, level])
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboard snapshots & weekly winners
+// ---------------------------------------------------------------------------
+
+model LeaderboardSnapshot {
+  id           String   @id @default(cuid())
+  userId       String
+  scope        String   // "overall" | "year1" | "year2"
+  period       String   // "all" | "weekly" | "monthly"
+  rank         Int
+  xp           Int
+  solvedCount  Int
+  streak       Int
+  capturedAt   DateTime @default(now())
+
+  @@index([scope, period, rank])
+}
+
+model WeeklyWinner {
+  id           String   @id @default(cuid())
+  weekLabel    String
+  challengeId  String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xpEarned     Int
+  solvedAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@unique([weekLabel, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & activity
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // "challenge_published" | "achievement" | "certificate" | "streak" | "leaderboard" | "announcement" | "submission"
+  title        String
+  message      String
+  link         String?
+  read         Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model ActivityLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // "submission" | "solve" | "achievement" | "certificate" | "level_up"
+  description  String
+  refId        String?
+  date         String   // YYYY-MM-DD (denormalized for streak/activity calendar)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+// ---------------------------------------------------------------------------
+// Admin: audit logs, plagiarism/integrity
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  adminId       String?
+  admin         AdminUser? @relation(fields: [adminId], references: [id])
+  action        String   // "challenge_create" | "challenge_edit" | "challenge_delete" | "flag_review" | "settings_update" | "view_submission" | "user_ban" ...
+  target        String?
+  details       String   @default("{}") // JSON
+  ip            String?
+  createdAt      DateTime @default(now())
+}
+
+model PlagiarismFlag {
+  id            String   @id @default(cuid())
+  submissionAId String
+  submissionBId String
+  submissionA   Submission @relation("FlagSubA", fields: [submissionAId], references: [id], onDelete: Cascade)
+  submissionB   Submission @relation("FlagSubB", fields: [submissionBId], references: [id], onDelete: Cascade)
+  similarity    Float    // 0..1
+  method        String   // "token_norm" | "whitespace_norm" | "identifier_norm" | "structural"
+  reason        String   // human-readable detection reason
+  status        String   @default("pending") // "pending" | "reviewed" | "dismissed" | "confirmed"
+  adminNote     String?
+  reviewerId    String?
+  reviewer      AdminUser? @relation("FlagAdminReviewer", fields: [reviewerId], references: [id])
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Platform configuration (settings stored in DB, editable by admin)
+// ---------------------------------------------------------------------------
+
+model PlatformSetting {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  value        String   // JSON-encoded value
+  updatedAt    DateTime @updatedAt
+}
