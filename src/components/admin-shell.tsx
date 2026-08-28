@@ -6,13 +6,14 @@ import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
-  LayoutDashboard, Users, Code2, FileCode2, ShieldCheck, BarChart3, Settings, LogOut, Menu, X, Sun, Moon, ScrollText, Trophy,
+  LayoutDashboard, Users, Code2, FileCode2, ShieldCheck, BarChart3, Settings, LogOut, Menu, X, Sun, Moon, ScrollText, Trophy, Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/achievements", label: "Achievements", icon: Award },
   { href: "/admin/winners", label: "Weekly Winners", icon: Trophy },
   { href: "/admin/participants", label: "Participants", icon: Users },
   { href: "/admin/challenges", label: "Challenges", icon: Code2 },

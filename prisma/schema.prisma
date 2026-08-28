@@ -43,6 +43,7 @@ model User {
   submissions   Submission[]
   achievements  UserAchievement[]
   certificates  Certificate[]
+  issuedCertificates IssuedCertificate[]
   notifications Notification[]
   xpTransactions XpTransaction[]
   activityLogs  ActivityLog[]
@@ -194,29 +195,84 @@ model LevelDef {
 }
 
 model Achievement {
-  id           String   @id @default(cuid())
-  key          String   @unique
-  name          String
-  description   String
-  rarity        String   @default("common") // common | rare | epic | legendary
-  icon          String   // lucide icon name
-  category      String   // "milestone" | "streak" | "speed" | "skill" | "consistency"
-  condition     String   // JSON describing unlock condition (evaluated server-side)
-  xpReward      Int      @default(0)
-  createdAt     DateTime @default(now())
+  id                  String            @id @default(cuid())
+  key                 String            @unique
+  name                String
+  description         String
+  category            String            @default("XP Milestone") // "XP Milestone" | "Challenge" | "Weekly Challenge" | "Streak" | "Competition" | "Special" | "Participation" | "Leadership"
+  type                String            @default("badge") // "badge" | "achievement"
+  rarity              String            @default("common") // common | rare | epic | legendary
+  icon                String            @default("Award") // lucide icon name
+  requirementType     String            @default("xp_threshold") // "xp_threshold" | "challenges_count" | "accepted_submissions" | "weekly_winner" | "streak" | "submission_count" | "specific_challenge" | "manual"
+  requirementValue    Int               @default(0)
+  specificChallengeId String?
+  condition           String?           // optional legacy JSON condition
+  xpReward            Int               @default(0)
+  isActive            Boolean           @default(true)
+  order               Int               @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  unlocks       UserAchievement[]
+  unlocks             UserAchievement[]
 }
 
 model UserAchievement {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievementId String
-  achievement  Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
-  unlockedAt   DateTime @default(now())
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+  awardType     String      @default("automatic") // "automatic" | "manual"
+  awardedById   String?
+  reason        String?
 
   @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+}
+
+model CertificateTemplate {
+  id               String              @id @default(cuid())
+  name             String
+  description      String
+  category         String              @default("Milestone") // "Milestone" | "Challenge" | "Weekly Champion" | "Participation" | "Special"
+  requirementType  String              @default("xp_threshold") // "xp_threshold" | "challenges_count" | "weekly_winner" | "manual"
+  requirementValue Int                 @default(0)
+  isAutomatic      Boolean             @default(true)
+  isActive         Boolean             @default(true)
+  issuerName       String              @default("A-I-M-L Club")
+  badgeColor       String              @default("#eab308")
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  issuedCerts      IssuedCertificate[]
+}
+
+model IssuedCertificate {
+  id                 String              @id @default(cuid())
+  verificationId     String              @unique // e.g. "CERT-AIML-2026-000123"
+  templateId         String
+  template           CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  recipientName      String
+  recipientUid       String
+  recipientYear      String
+  issueDate          DateTime            @default(now())
+  issuedById         String?
+  status             String              @default("VALID") // "VALID" | "REVOKED"
+  relatedChallengeId String?
+  relatedWinnerId    String?
+  adminNote          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([userId, templateId])
+  @@index([verificationId])
+  @@index([userId])
 }
 
 model Certificate {
@@ -271,6 +327,8 @@ model WeeklyWinner {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
+  @@unique([weekLabel, year, rank])
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------------

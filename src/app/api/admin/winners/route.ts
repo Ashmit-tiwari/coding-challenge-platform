@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin, writeAudit } from "@/lib/admin";
 import { ok, fail, unauthorized, forbidden, safeJson } from "@/lib/api";
+import { evaluateAchievements, evaluateCertificates } from "@/lib/achievements";
 
 // GET /api/admin/winners?weekLabel=...&year=...
 // Returns declared winners, weekly challenges, and eligible submissions for winner evaluation.
@@ -225,6 +226,10 @@ export async function POST(req: NextRequest) {
         link: "/leaderboard",
       },
     });
+
+    // Auto-evaluate winner-related badges and certificates
+    await evaluateAchievements(user.id);
+    await evaluateCertificates(user.id);
   } catch {}
 
   return ok({ winner });
