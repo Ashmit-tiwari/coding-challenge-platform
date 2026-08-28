@@ -1,6 +1,6 @@
-// Standalone Code Execution & Judge Engine
-// Executes user-submitted code in an isolated subprocess with strict timeouts and memory boundaries.
-// Works seamlessly in Next.js Serverless runtime, local development, and container environments.
+// Multi-Tier Standalone & Cloud Code Execution Engine
+// Tier 1: High-performance local subprocess execution (Windows & POSIX)
+// Tier 2: Cloud sandbox runner (Wandbox API) for serverless environments (Vercel) where local compilers are absent
 
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -52,7 +52,6 @@ interface RunOpts {
   cwd: string;
   stdin: string;
   timeLimitMs: number;
-  memoryLimitMb?: number;
 }
 
 function runSubprocess(
@@ -71,12 +70,12 @@ function runSubprocess(
     try {
       proc = spawn(cmd, args, {
         cwd: opts.cwd,
+        shell: process.platform === "win32",
         stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
           PYTHONDONTWRITEBYTECODE: "1",
           PYTHONUNBUFFERED: "1",
-          NODE_OPTIONS: "--max-old-space-size=256",
         },
       });
     } catch (err: any) {
@@ -95,7 +94,7 @@ function runSubprocess(
       try {
         proc.kill("SIGKILL");
       } catch {}
-    }, opts.timeLimitMs + 500);
+    }, opts.timeLimitMs + 1000);
 
     proc.stdout?.on("data", (chunk: Buffer) => {
       if (stdout.length < 100000) stdout += chunk.toString();
@@ -144,25 +143,114 @@ function runSubprocess(
   });
 }
 
-// Find Python binary (python or python3)
-let cachedPythonCmd: string | null = null;
-async function getPythonCommand(): Promise<string> {
-  if (cachedPythonCmd) return cachedPythonCmd;
-  for (const cmd of ["python", "python3", "py"]) {
-    try {
-      const res = await runSubprocess(cmd, ["--version"], { cwd: process.cwd(), stdin: "", timeLimitMs: 2000 });
-      if (res.exitCode === 0 || res.stdout.includes("Python") || res.stderr.includes("Python")) {
-        cachedPythonCmd = cmd;
-        return cmd;
-      }
-    } catch {}
+// Wandbox cloud runner for serverless environments
+const WANDBOX_COMPILERS: Record<string, string> = {
+  python: "cpython-3.12.7",
+  py: "cpython-3.12.7",
+  python3: "cpython-3.12.7",
+  javascript: "nodejs-20.17.0",
+  js: "nodejs-20.17.0",
+  cpp: "gcc-13.2.0",
+  "c++": "gcc-13.2.0",
+  c: "gcc-13.2.0",
+};
+
+async function executeViaCloudSandbox(
+  language: string,
+  code: string,
+  stdin: string,
+  timeLimitMs: number
+): Promise<ExecutionResult> {
+  const compiler = WANDBOX_COMPILERS[language.toLowerCase()];
+  if (!compiler) {
+    return {
+      status: "Internal Error",
+      passed: false,
+      stdout: "",
+      stderr: `Unsupported cloud compiler for language ${language}`,
+      execTimeMs: 0,
+      message: `Unsupported language ${language}`,
+    };
   }
-  cachedPythonCmd = "python";
-  return "python";
+
+  const start = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeLimitMs + 8000);
+
+    const res = await fetch("https://wandbox.org/api/compile.json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        compiler,
+        code,
+        stdin,
+      }),
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return {
+        status: "Internal Error",
+        passed: false,
+        stdout: "",
+        stderr: `Cloud runner HTTP ${res.status}`,
+        execTimeMs: Date.now() - start,
+        message: "Cloud execution service temporarily unavailable.",
+      };
+    }
+
+    const data = await res.json();
+    const execTimeMs = Date.now() - start;
+    const stdout = data.program_output || data.program_message || "";
+    const stderr = data.compiler_error || data.program_error || data.compiler_message || "";
+    const statusVal = String(data.status || "0");
+
+    if (data.compiler_error || (data.compiler_message && statusVal !== "0")) {
+      return {
+        status: "Compilation Error",
+        passed: false,
+        stdout,
+        stderr: stderr.slice(0, 3000),
+        execTimeMs,
+        message: "Compilation error.",
+      };
+    }
+
+    if (statusVal !== "0") {
+      const isSyntaxErr = /SyntaxError|IndentationError|Unexpected token/.test(stderr);
+      return {
+        status: isSyntaxErr ? "Compilation Error" : "Runtime Error",
+        passed: false,
+        stdout,
+        stderr: stderr.slice(0, 3000),
+        execTimeMs,
+        message: isSyntaxErr ? "Syntax error." : "Program exited with non-zero exit code.",
+      };
+    }
+
+    return {
+      status: "Accepted",
+      passed: true,
+      stdout,
+      stderr,
+      execTimeMs,
+    };
+  } catch (err: any) {
+    return {
+      status: "Internal Error",
+      passed: false,
+      stdout: "",
+      stderr: err?.message || String(err),
+      execTimeMs: Date.now() - start,
+      message: "Execution timed out or cloud service unreachable.",
+    };
+  }
 }
 
-// 1. Python runner
-async function executePython(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
+// Local Python Execution
+async function executeLocalPython(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
   const runId = `py-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const runDir = join(RUN_TMP_BASE, runId);
   try {
@@ -170,21 +258,29 @@ async function executePython(code: string, stdin: string, timeLimitMs: number): 
     const srcPath = join(runDir, "solution.py");
     writeFileSync(srcPath, code, "utf-8");
 
-    const pyCmd = await getPythonCommand();
-    const res = await runSubprocess(pyCmd, [srcPath], {
-      cwd: runDir,
-      stdin,
-      timeLimitMs,
-    });
+    // Try common python command invocations
+    let res: any = null;
+    const pyCmds = process.platform === "win32"
+      ? ["py -3", "py", "python", "python3", "C:\\Users\\Acer\\AppData\\Local\\Programs\\Python\\Python314\\python.exe"]
+      : ["python3", "python"];
 
-    if (res.error) {
+    for (const cmd of pyCmds) {
+      const [bin, ...args] = cmd.split(" ");
+      res = await runSubprocess(bin, [...args, srcPath], {
+        cwd: runDir,
+        stdin,
+        timeLimitMs,
+      });
+      if (!res.error && res.exitCode !== -1) break;
+    }
+
+    if (!res || res.error) {
       return {
         status: "Internal Error",
         passed: false,
-        stdout: res.stdout,
-        stderr: res.stderr || res.error,
-        execTimeMs: res.execTimeMs,
-        message: "Python runtime could not be launched.",
+        stdout: "",
+        stderr: res?.error || "Local Python binary not found",
+        execTimeMs: res?.execTimeMs || 0,
       };
     }
 
@@ -225,7 +321,6 @@ async function executePython(code: string, stdin: string, timeLimitMs: number): 
       stdout: "",
       stderr: err?.message || String(err),
       execTimeMs: 0,
-      message: "Judge runner encountered an error.",
     };
   } finally {
     try {
@@ -234,8 +329,8 @@ async function executePython(code: string, stdin: string, timeLimitMs: number): 
   }
 }
 
-// 2. JavaScript / Node runner
-async function executeJavaScript(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
+// Local JavaScript Execution
+async function executeLocalJavaScript(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
   const runId = `js-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const runDir = join(RUN_TMP_BASE, runId);
   try {
@@ -253,10 +348,9 @@ async function executeJavaScript(code: string, stdin: string, timeLimitMs: numbe
       return {
         status: "Internal Error",
         passed: false,
-        stdout: res.stdout,
-        stderr: res.stderr || res.error,
+        stdout: "",
+        stderr: res.error,
         execTimeMs: res.execTimeMs,
-        message: "Node runtime could not be launched.",
       };
     }
 
@@ -297,7 +391,6 @@ async function executeJavaScript(code: string, stdin: string, timeLimitMs: numbe
       stdout: "",
       stderr: err?.message || String(err),
       execTimeMs: 0,
-      message: "Judge runner encountered an error.",
     };
   } finally {
     try {
@@ -306,291 +399,36 @@ async function executeJavaScript(code: string, stdin: string, timeLimitMs: numbe
   }
 }
 
-// 3. C++ runner
-async function executeCpp(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
-  const runId = `cpp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const runDir = join(RUN_TMP_BASE, runId);
-  try {
-    mkdirSync(runDir, { recursive: true });
-    const srcPath = join(runDir, "solution.cpp");
-    const binPath = join(runDir, process.platform === "win32" ? "solution.exe" : "solution");
-    writeFileSync(srcPath, code, "utf-8");
-
-    // Compile
-    const compileRes = await runSubprocess("g++", ["-O2", "-std=c++17", "-o", binPath, srcPath], {
-      cwd: runDir,
-      stdin: "",
-      timeLimitMs: 8000,
-    });
-
-    if (compileRes.exitCode !== 0) {
-      return {
-        status: "Compilation Error",
-        passed: false,
-        stdout: "",
-        stderr: (compileRes.stderr || compileRes.stdout || "C++ compilation failed").slice(0, 3000),
-        execTimeMs: compileRes.execTimeMs,
-        message: "C++ compilation failed.",
-      };
-    }
-
-    // Run binary
-    const runRes = await runSubprocess(binPath, [], {
-      cwd: runDir,
-      stdin,
-      timeLimitMs,
-    });
-
-    if (runRes.timedOut) {
-      return {
-        status: "Time Limit Exceeded",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr,
-        execTimeMs: runRes.execTimeMs,
-        message: `Execution exceeded time limit of ${timeLimitMs}ms.`,
-      };
-    }
-
-    if (runRes.exitCode !== 0) {
-      return {
-        status: "Runtime Error",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr.slice(0, 3000),
-        execTimeMs: runRes.execTimeMs,
-        message: "Program exited with a non-zero status.",
-      };
-    }
-
-    return {
-      status: "Accepted",
-      passed: true,
-      stdout: runRes.stdout,
-      stderr: runRes.stderr,
-      execTimeMs: runRes.execTimeMs,
-    };
-  } catch (err: any) {
-    return {
-      status: "Internal Error",
-      passed: false,
-      stdout: "",
-      stderr: err?.message || String(err),
-      execTimeMs: 0,
-      message: "C++ compiler/runner unavailable.",
-    };
-  } finally {
-    try {
-      rmSync(runDir, { recursive: true, force: true });
-    } catch {}
-  }
-}
-
-// 4. C runner
-async function executeC(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
-  const runId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const runDir = join(RUN_TMP_BASE, runId);
-  try {
-    mkdirSync(runDir, { recursive: true });
-    const srcPath = join(runDir, "solution.c");
-    const binPath = join(runDir, process.platform === "win32" ? "solution.exe" : "solution");
-    writeFileSync(srcPath, code, "utf-8");
-
-    // Compile
-    const compileRes = await runSubprocess("gcc", ["-O2", "-std=c11", "-o", binPath, srcPath], {
-      cwd: runDir,
-      stdin: "",
-      timeLimitMs: 8000,
-    });
-
-    if (compileRes.exitCode !== 0) {
-      return {
-        status: "Compilation Error",
-        passed: false,
-        stdout: "",
-        stderr: (compileRes.stderr || compileRes.stdout || "C compilation failed").slice(0, 3000),
-        execTimeMs: compileRes.execTimeMs,
-        message: "C compilation failed.",
-      };
-    }
-
-    // Run binary
-    const runRes = await runSubprocess(binPath, [], {
-      cwd: runDir,
-      stdin,
-      timeLimitMs,
-    });
-
-    if (runRes.timedOut) {
-      return {
-        status: "Time Limit Exceeded",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr,
-        execTimeMs: runRes.execTimeMs,
-        message: `Execution exceeded time limit of ${timeLimitMs}ms.`,
-      };
-    }
-
-    if (runRes.exitCode !== 0) {
-      return {
-        status: "Runtime Error",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr.slice(0, 3000),
-        execTimeMs: runRes.execTimeMs,
-        message: "Program exited with a non-zero status.",
-      };
-    }
-
-    return {
-      status: "Accepted",
-      passed: true,
-      stdout: runRes.stdout,
-      stderr: runRes.stderr,
-      execTimeMs: runRes.execTimeMs,
-    };
-  } catch (err: any) {
-    return {
-      status: "Internal Error",
-      passed: false,
-      stdout: "",
-      stderr: err?.message || String(err),
-      execTimeMs: 0,
-      message: "C compiler/runner unavailable.",
-    };
-  } finally {
-    try {
-      rmSync(runDir, { recursive: true, force: true });
-    } catch {}
-  }
-}
-
-// 5. Java runner
-async function executeJava(code: string, stdin: string, timeLimitMs: number): Promise<ExecutionResult> {
-  const runId = `java-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const runDir = join(RUN_TMP_BASE, runId);
-  try {
-    mkdirSync(runDir, { recursive: true });
-    const srcPath = join(runDir, "Main.java");
-    writeFileSync(srcPath, code, "utf-8");
-
-    // Compile
-    const compileRes = await runSubprocess("javac", ["Main.java"], {
-      cwd: runDir,
-      stdin: "",
-      timeLimitMs: 10000,
-    });
-
-    if (compileRes.exitCode !== 0) {
-      return {
-        status: "Compilation Error",
-        passed: false,
-        stdout: "",
-        stderr: (compileRes.stderr || "Java compilation failed").slice(0, 3000),
-        execTimeMs: compileRes.execTimeMs,
-        message: "Java compilation failed.",
-      };
-    }
-
-    // Run
-    const runRes = await runSubprocess("java", ["-Xmx256m", "Main"], {
-      cwd: runDir,
-      stdin,
-      timeLimitMs,
-    });
-
-    if (runRes.timedOut) {
-      return {
-        status: "Time Limit Exceeded",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr,
-        execTimeMs: runRes.execTimeMs,
-        message: `Execution exceeded time limit of ${timeLimitMs}ms.`,
-      };
-    }
-
-    if (runRes.exitCode !== 0) {
-      return {
-        status: "Runtime Error",
-        passed: false,
-        stdout: runRes.stdout,
-        stderr: runRes.stderr.slice(0, 3000),
-        execTimeMs: runRes.execTimeMs,
-        message: "Java runtime exception occurred.",
-      };
-    }
-
-    return {
-      status: "Accepted",
-      passed: true,
-      stdout: runRes.stdout,
-      stderr: runRes.stderr,
-      execTimeMs: runRes.execTimeMs,
-    };
-  } catch (err: any) {
-    return {
-      status: "Internal Error",
-      passed: false,
-      stdout: "",
-      stderr: err?.message || String(err),
-      execTimeMs: 0,
-      message: "Java compiler/runner unavailable.",
-    };
-  } finally {
-    try {
-      rmSync(runDir, { recursive: true, force: true });
-    } catch {}
-  }
-}
-
-// Master execution entry point
+// Master execution entry point: Local with automated Cloud fallback
 export async function executeCode(
   language: string,
   code: string,
   stdin: string,
   expectedOutput?: string,
-  timeLimitMs = 2000,
+  timeLimitMs = 2500,
   memoryLimitMb = 256
 ): Promise<ExecutionResult> {
   const lang = (language || "").toLowerCase().trim();
-  const limit = Math.min(Math.max(timeLimitMs || 2000, 200), 15000);
+  const limit = Math.min(Math.max(timeLimitMs || 2500, 200), 15000);
 
   let rawResult: ExecutionResult;
-  switch (lang) {
-    case "python":
-    case "py":
-    case "python3":
-      rawResult = await executePython(code, stdin, limit);
-      break;
-    case "javascript":
-    case "js":
-    case "node":
-      rawResult = await executeJavaScript(code, stdin, limit);
-      break;
-    case "cpp":
-    case "c++":
-      rawResult = await executeCpp(code, stdin, limit);
-      break;
-    case "c":
-      rawResult = await executeC(code, stdin, limit);
-      break;
-    case "java":
-      rawResult = await executeJava(code, stdin, limit);
-      break;
-    default:
-      return {
-        status: "Internal Error",
-        passed: false,
-        stdout: "",
-        stderr: `Unsupported language: ${lang}`,
-        execTimeMs: 0,
-        message: `Language '${lang}' is not supported by judge engine.`,
-      };
+
+  // 1. Try local execution first for ultra-fast response (<50ms)
+  if (["python", "py", "python3"].includes(lang)) {
+    rawResult = await executeLocalPython(code, stdin, limit);
+  } else if (["javascript", "js", "node"].includes(lang)) {
+    rawResult = await executeLocalJavaScript(code, stdin, limit);
+  } else {
+    // C++, C, Java or others: fallback to cloud sandbox
+    rawResult = await executeViaCloudSandbox(lang, code, stdin, limit);
   }
 
-  // If the run succeeded without runtime or compile error, compare output against expected
+  // 2. If local execution encountered Internal Error (e.g. missing compiler in environment/Vercel), fallback to Cloud Sandbox
+  if (rawResult.status === "Internal Error") {
+    rawResult = await executeViaCloudSandbox(lang, code, stdin, limit);
+  }
+
+  // 3. If executed successfully, compare output against expected
   if (rawResult.status === "Accepted" && expectedOutput !== undefined) {
     const isMatch = checkAnswer(rawResult.stdout, expectedOutput);
     if (!isMatch) {
