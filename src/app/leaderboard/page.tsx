@@ -94,9 +94,14 @@ interface LeaderboardRow {
 }
 
 interface HallOfFameEntry {
+  id?: string;
   weekLabel: string;
-  xpEarned: number;
-  solvedAt: string;
+  year?: string;
+  rank?: number;
+  title?: string;
+  adminNote?: string | null;
+  createdAt?: string;
+  challenge?: { title: string; slug: string } | null;
   user: {
     id: string;
     uid: string;
@@ -846,103 +851,208 @@ function HallOfFame({
   entries: HallOfFameEntry[];
   loading: boolean;
 }) {
+  // Group entries by weekLabel
+  const groupedWeeks: Record<string, { weekLabel: string; year1: HallOfFameEntry[]; year2: HallOfFameEntry[] }> = {};
+
+  for (const entry of entries) {
+    const w = entry.weekLabel || "Weekly Challenge";
+    if (!groupedWeeks[w]) {
+      groupedWeeks[w] = { weekLabel: w, year1: [], year2: [] };
+    }
+    const y = String(entry.year || entry.user?.year || "1");
+    if (y === "2") {
+      groupedWeeks[w].year2.push(entry);
+    } else {
+      groupedWeeks[w].year1.push(entry);
+    }
+  }
+
+  // Sort by rank within each year
+  for (const w of Object.values(groupedWeeks)) {
+    w.year1.sort((a, b) => (a.rank || 1) - (b.rank || 1));
+    w.year2.sort((a, b) => (a.rank || 1) - (b.rank || 1));
+  }
+
+  const weeksList = Object.values(groupedWeeks);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.15 }}
+      className="space-y-4"
     >
-      <Card>
+      <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Star className="h-5 w-5 text-amber-500" /> Hall of Fame
-          </CardTitle>
-          <CardDescription>
-            Weekly challenge winners from across the competition.
-          </CardDescription>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Trophy className="h-5 w-5 text-amber-500" /> Weekly Challenge Winners
+              </CardTitle>
+              <CardDescription>
+                Admin-declared weekly winners & runner ups — evaluated separately for Year 1 and Year 2.
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs gap-1 font-semibold">
+              <Sparkles className="h-3 w-3" /> Admin Declared
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-44 rounded-xl" />
               ))}
             </div>
-          ) : entries.length === 0 ? (
-            <div className="py-10 flex flex-col items-center justify-center gap-3 text-center">
+          ) : weeksList.length === 0 ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
               <div className="rounded-full bg-amber-500/10 p-3 text-amber-600 dark:text-amber-300">
-                <Star className="h-6 w-6" />
+                <Trophy className="h-7 w-7" />
               </div>
               <div>
-                <p className="font-semibold">No weekly winners yet</p>
-                <p className="text-sm text-muted-foreground">
-                  Weekly winners will appear here as the competition progresses.
+                <p className="font-semibold text-base">No weekly winners declared yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Weekly challenge winners will appear here once declared by administrators after code review.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {entries.map((entry, i) => (
-                <motion.div
-                  key={`${entry.weekLabel}-${entry.user.id}-${i}`}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
-                >
-                  <div className="relative rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 overflow-hidden">
-                    <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-amber-500/10 blur-2xl" />
-                    <div className="flex items-center gap-3 relative">
-                      <AvatarSvg
-                        config={entry.user.avatar || {}}
-                        size={44}
-                        className="rounded-full ring-2 ring-amber-400/40"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/profile?uid=${entry.user.uid}`}
-                          className="font-semibold text-sm hover:text-primary truncate block"
-                        >
-                          {entry.user.name}
-                        </Link>
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                          <Badge
-                            variant="outline"
+            weeksList.map((week) => (
+              <div key={week.weekLabel} className="rounded-xl border border-border/60 p-4 bg-muted/10 space-y-4">
+                <div className="flex items-center justify-between border-b border-border/50 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="brand-gradient h-7 w-7 rounded-lg flex items-center justify-center text-brand-foreground font-bold text-xs">
+                      W
+                    </div>
+                    <span className="font-bold text-sm tracking-tight">{week.weekLabel}</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    Separate Cohort Results
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Year 1 Cohort */}
+                  <div className="rounded-lg border border-border/60 bg-background/80 p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30 text-xs font-bold">
+                        🎓 YEAR 1 COHORT
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground font-mono">1st Year Students</span>
+                    </div>
+
+                    {week.year1.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-muted-foreground border border-dashed border-border/50 rounded-md">
+                        No Year 1 winners declared for this week.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {week.year1.map((w) => (
+                          <div
+                            key={w.id || w.user.id}
                             className={cn(
-                              "text-[10px] px-1.5 py-0",
-                              yearBadgeClass(entry.user.year),
+                              "flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors",
+                              w.rank === 1
+                                ? "border-amber-500/40 bg-amber-500/5"
+                                : w.rank === 2
+                                ? "border-slate-400/40 bg-slate-400/5"
+                                : "border-amber-700/40 bg-amber-700/5"
                             )}
                           >
-                            {yearLabel(entry.user.year)}
-                          </Badge>
-                          <span className="font-mono truncate">
-                            {entry.user.uid}
-                          </span>
-                        </div>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-sm">
+                                {w.rank === 1 ? "🏆" : w.rank === 2 ? "🥈" : "🥉"}
+                              </span>
+                              <AvatarSvg config={w.user.avatar || {}} size={32} className="rounded-full flex-shrink-0" />
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/profile?uid=${w.user.uid}`}
+                                  className="font-semibold text-xs hover:text-primary truncate block"
+                                >
+                                  {w.user.name}
+                                </Link>
+                                <span className="font-mono text-[10px] text-muted-foreground">{w.user.uid}</span>
+                              </div>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] font-semibold flex-shrink-0",
+                                w.rank === 1 && "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                                w.rank === 2 && "bg-slate-400/20 text-slate-700 dark:text-slate-300",
+                                w.rank === 3 && "bg-amber-700/20 text-amber-800 dark:text-amber-400"
+                              )}
+                            >
+                              {w.title || (w.rank === 1 ? "Winner" : w.rank === 2 ? "1st Runner Up" : "2nd Runner Up")}
+                            </Badge>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-center justify-between text-sm">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Week
-                        </div>
-                        <div className="font-semibold">{entry.weekLabel}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Earned
-                        </div>
-                        <div className="font-semibold text-amber-600 dark:text-amber-300 inline-flex items-center gap-1">
-                          <Zap className="h-3 w-3" />+{entry.xpEarned} XP
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[11px] text-muted-foreground">
-                      Solved {formatDate(entry.solvedAt)}
-                    </div>
+                    )}
                   </div>
-                </motion.div>
-              ))}
-            </div>
+
+                  {/* Year 2 Cohort */}
+                  <div className="rounded-lg border border-border/60 bg-background/80 p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs font-bold">
+                        🎓 YEAR 2 COHORT
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground font-mono">2nd Year Students</span>
+                    </div>
+
+                    {week.year2.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-muted-foreground border border-dashed border-border/50 rounded-md">
+                        No Year 2 winners declared for this week.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {week.year2.map((w) => (
+                          <div
+                            key={w.id || w.user.id}
+                            className={cn(
+                              "flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors",
+                              w.rank === 1
+                                ? "border-amber-500/40 bg-amber-500/5"
+                                : w.rank === 2
+                                ? "border-slate-400/40 bg-slate-400/5"
+                                : "border-amber-700/40 bg-amber-700/5"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-sm">
+                                {w.rank === 1 ? "🏆" : w.rank === 2 ? "🥈" : "🥉"}
+                              </span>
+                              <AvatarSvg config={w.user.avatar || {}} size={32} className="rounded-full flex-shrink-0" />
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/profile?uid=${w.user.uid}`}
+                                  className="font-semibold text-xs hover:text-primary truncate block"
+                                >
+                                  {w.user.name}
+                                </Link>
+                                <span className="font-mono text-[10px] text-muted-foreground">{w.user.uid}</span>
+                              </div>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] font-semibold flex-shrink-0",
+                                w.rank === 1 && "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+                                w.rank === 2 && "bg-slate-400/20 text-slate-700 dark:text-slate-300",
+                                w.rank === 3 && "bg-amber-700/20 text-amber-800 dark:text-amber-400"
+                              )}
+                            >
+                              {w.title || (w.rank === 1 ? "Winner" : w.rank === 2 ? "1st Runner Up" : "2nd Runner Up")}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </CardContent>
       </Card>

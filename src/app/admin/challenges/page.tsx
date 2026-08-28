@@ -76,6 +76,7 @@ export default function AdminChallengesPage() {
   const [search, setSearch] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createTab, setCreateTab] = useState("details");
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<ChallengeListItem | null>(null);
@@ -380,7 +381,7 @@ export default function AdminChallengesPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <Tabs defaultValue="details" className="flex-1 min-h-0 flex flex-col">
+            <Tabs value={createTab} onValueChange={setCreateTab} className="flex-1 min-h-0 flex flex-col">
               <TabsList className="self-start">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="statement">Statement</TabsTrigger>

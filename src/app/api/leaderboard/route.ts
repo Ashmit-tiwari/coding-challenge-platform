@@ -91,16 +91,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // top weekly winners (hall of fame) — last 8 weeks
+  // top weekly winners (hall of fame) — admin declared winners
   const recentWinners = await db.weeklyWinner.findMany({
-    take: 24,
-    orderBy: { createdAt: "desc" },
-    include: { user: { include: { avatar: true } } },
+    take: 36,
+    orderBy: [{ weekLabel: "desc" }, { year: "asc" }, { rank: "asc" }],
+    include: {
+      user: { include: { avatar: true } },
+      challenge: { select: { title: true, slug: true } },
+    },
   });
   const hallOfFame = recentWinners.map((w) => ({
+    id: w.id,
     weekLabel: w.weekLabel,
-    xpEarned: w.xpEarned,
-    solvedAt: w.solvedAt,
+    year: w.year,
+    rank: w.rank,
+    title: w.title,
+    adminNote: w.adminNote,
+    createdAt: w.createdAt,
+    challenge: w.challenge,
     user: {
       id: w.user.id,
       uid: w.user.uid,

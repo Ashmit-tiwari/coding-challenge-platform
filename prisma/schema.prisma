@@ -61,6 +61,7 @@ model AdminUser {
 
   auditLogs     AuditLog[]
   reviewedFlags PlagiarismFlag[] @relation("FlagAdminReviewer")
+  declaredWins  WeeklyWinner[]   @relation("DeclaredWinners")
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,7 @@ model Challenge {
 
   testCases     TestCase[]
   submissions   Submission[]
+  weeklyWinners WeeklyWinner[]
 }
 
 model TestCase {
@@ -158,6 +160,7 @@ model Submission {
 
   plagiarismA   PlagiarismFlag[] @relation("FlagSubA")
   plagiarismB   PlagiarismFlag[] @relation("FlagSubB")
+  winningWins   WeeklyWinner[]
 
   @@index([userId, challengeId])
   @@index([challengeId])
@@ -250,16 +253,24 @@ model LeaderboardSnapshot {
 }
 
 model WeeklyWinner {
-  id           String   @id @default(cuid())
-  weekLabel    String
-  challengeId  String
+  id           String      @id @default(cuid())
+  weekLabel    String      // e.g. "Week 1", "Week 5"
+  challengeId  String?
+  challenge    Challenge?  @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  year         String      // "1" | "2"
+  rank         Int         @default(1) // 1 = Winner, 2 = 1st Runner Up, 3 = 2nd Runner Up
+  title        String?     // "Winner" | "1st Runner Up" | "2nd Runner Up"
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  xpEarned     Int
-  solvedAt     DateTime
-  createdAt     DateTime @default(now())
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissionId String?
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  declaredById String?
+  declaredBy   AdminUser?  @relation("DeclaredWinners", fields: [declaredById], references: [id], onDelete: SetNull)
+  adminNote    String?
+  xpEarned     Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  @@unique([weekLabel, userId])
 }
 
 // ---------------------------------------------------------------------------
