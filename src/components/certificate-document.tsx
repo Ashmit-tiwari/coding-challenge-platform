@@ -145,10 +145,12 @@ export function CertificateDocument({
             <span className="text-[9px] uppercase tracking-widest font-semibold text-slate-500">
               In Association With
             </span>
-            <div className="inline-flex items-center font-black text-base tracking-tight drop-shadow-sm">
-              <span className="text-[#00AEEF]">byte</span>
-              <span className="text-[#F37021]">XL</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/bytexl-logo.png"
+              alt="byteXL"
+              className="h-6 sm:h-7 w-auto object-contain inline-block mix-blend-multiply drop-shadow-sm"
+            />
           </div>
         </div>
 
