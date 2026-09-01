@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Award, Trophy, Medal, Crown, Flame, Zap, ShieldCheck, Sparkles, Star,
   Code2, CheckCircle2, Lock, Download, Printer, ExternalLink, RefreshCw,
-  GraduationCap, ScrollText, Check, ShieldAlert, FileText, ArrowRight
+  GraduationCap, ScrollText, Check, ShieldAlert, FileText, ArrowRight, Eye
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { CertificateDocument, CertificateData } from "@/components/certificate-document";
 import { cn } from "@/lib/utils";
 
 interface BadgeItem {
@@ -43,32 +44,14 @@ interface BadgeItem {
   };
 }
 
-interface CertificateItem {
-  id: string;
-  verificationId: string;
-  title: string;
-  description?: string | null;
-  recipientName: string;
-  recipientUid: string;
-  recipientYear: string;
-  issueDate: string;
-  status: string;
-  category: string;
-  badgeColor: string;
-  issuerName: string;
-  adminNote?: string | null;
-}
-
 export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [badges, setBadges] = useState<BadgeItem[]>([]);
-  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [certificates, setCertificates] = useState<CertificateData[]>([]);
   const [stats, setStats] = useState<any>({});
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [viewCert, setViewCert] = useState<CertificateItem | null>(null);
-
-  const certPrintRef = useRef<HTMLDivElement>(null);
+  const [viewCert, setViewCert] = useState<CertificateData | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -94,10 +77,6 @@ export default function AchievementsPage() {
     fetchData();
   }, [fetchData]);
 
-  const handlePrintCertificate = () => {
-    window.print();
-  };
-
   const categories = ["all", "XP Milestone", "Challenge", "Weekly Challenge", "Streak", "Special", "Participation"];
 
   const filteredBadges = badges.filter((b) => {
@@ -114,10 +93,10 @@ export default function AchievementsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card/90 to-primary/5 p-6 sm:p-8"
         >
-          <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+          <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 text-xs font-semibold">
                 <Trophy className="h-3.5 w-3.5" /> Achievements & Honors
               </div>
               <h1 className="text-3xl font-extrabold tracking-tight">Your Hall of Achievements</h1>
@@ -153,8 +132,8 @@ export default function AchievementsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-emerald-500" />
-              <h2 className="text-lg font-bold tracking-tight">Verifiable Certificates</h2>
+              <GraduationCap className="h-5 w-5 text-indigo-500" />
+              <h2 className="text-lg font-bold tracking-tight">Official Verifiable Certificates</h2>
             </div>
             <Badge variant="outline" className="text-xs font-normal">
               {certificates.length} Earned
@@ -173,7 +152,7 @@ export default function AchievementsPage() {
                 <GraduationCap className="h-8 w-8 text-muted-foreground mx-auto" />
                 <div className="font-semibold text-sm">No certificates earned yet</div>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  Earn XP milestones or win weekly coding challenges to receive official certificates with public verification IDs.
+                  Earn XP milestones or win weekly coding challenges to receive official certificates verified by Chandigarh University, AI & ML Club, and byteXL.
                 </p>
               </CardContent>
             </Card>
@@ -181,23 +160,23 @@ export default function AchievementsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {certificates.map((cert) => (
                 <Card
-                  key={cert.id}
-                  className="border border-amber-500/40 bg-gradient-to-br from-card via-card to-amber-500/5 hover:border-amber-500 transition-all shadow-sm overflow-hidden"
+                  key={cert.verificationId}
+                  className="border border-indigo-500/30 bg-gradient-to-br from-card via-card to-indigo-500/5 hover:border-indigo-500 transition-all shadow-sm overflow-hidden"
                 >
                   <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
                     <div>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 text-xl font-bold">
+                          <div className="h-11 w-11 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-600 text-xl font-bold">
                             🎓
                           </div>
                           <div>
                             <div className="font-bold text-base leading-tight">{cert.title}</div>
-                            <div className="text-xs text-muted-foreground">{cert.issuerName}</div>
+                            <div className="text-xs text-muted-foreground">{cert.issuerName || "AI & ML Club • byteXL"}</div>
                           </div>
                         </div>
                         <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] gap-1 font-mono">
-                          <CheckCircle className="h-3 w-3" /> {cert.status}
+                          <CheckCircle2 className="h-3 w-3" /> {cert.status || "VALID"}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
@@ -206,7 +185,7 @@ export default function AchievementsPage() {
                     </div>
 
                     <div className="pt-3 border-t border-border/50 flex items-center justify-between text-xs flex-wrap gap-2">
-                      <div className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-bold">
+                      <div className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
                         ID: {cert.verificationId}
                       </div>
                       <div className="flex items-center gap-2">
@@ -214,9 +193,9 @@ export default function AchievementsPage() {
                           size="sm"
                           variant="outline"
                           onClick={() => setViewCert(cert)}
-                          className="h-7 text-xs gap-1 font-medium"
+                          className="h-7 text-xs gap-1 font-medium border-indigo-500/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
                         >
-                          <Eye className="h-3 w-3" /> View Certificate
+                          <Eye className="h-3 w-3" /> View & Download Certificate
                         </Button>
                         <Link
                           href={`/verify/${cert.verificationId}`}
@@ -362,100 +341,18 @@ export default function AchievementsPage() {
 
         {/* VIEW / DOWNLOAD CERTIFICATE MODAL */}
         <Dialog open={!!viewCert} onOpenChange={(o) => { if (!o) setViewCert(null); }}>
-          <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto p-0 border-0 bg-transparent shadow-2xl">
-            <div
-              ref={certPrintRef}
-              className="relative p-8 sm:p-12 rounded-2xl bg-zinc-950 text-zinc-100 border-4 border-amber-500/80 shadow-2xl overflow-hidden font-serif select-none"
-              style={{
-                backgroundImage: "radial-gradient(ellipse at center, rgba(234, 179, 8, 0.08) 0%, rgba(9, 9, 11, 0.95) 75%)"
-              }}
-            >
-              {/* Outer Golden Border & Inner Line */}
-              <div className="absolute inset-3 border border-amber-500/30 rounded-xl pointer-events-none" />
-              <div className="absolute top-4 left-4 text-amber-500/20 text-3xl font-mono">✦</div>
-              <div className="absolute top-4 right-4 text-amber-500/20 text-3xl font-mono">✦</div>
-              <div className="absolute bottom-4 left-4 text-amber-500/20 text-3xl font-mono">✦</div>
-              <div className="absolute bottom-4 right-4 text-amber-500/20 text-3xl font-mono">✦</div>
+          <DialogContent className="sm:max-w-4xl max-h-[95vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader className="mb-2">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <GraduationCap className="h-5 w-5 text-indigo-600" />
+                Official Certificate Viewer
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Rendered with dynamic credentials from Chandigarh University, AI & ML Club, and byteXL.
+              </DialogDescription>
+            </DialogHeader>
 
-              {/* Watermark Logo */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
-                <Award className="h-96 w-96 text-amber-500" />
-              </div>
-
-              <div className="relative text-center space-y-6">
-                {/* Header */}
-                <div className="space-y-1">
-                  <div className="text-xs uppercase tracking-[0.3em] text-amber-400/90 font-sans font-semibold">
-                    {viewCert?.issuerName || "A-I-M-L CLUB"}
-                  </div>
-                  <h2 className="text-2xl sm:text-4xl font-extrabold uppercase tracking-widest text-amber-400 drop-shadow">
-                    CERTIFICATE OF ACHIEVEMENT
-                  </h2>
-                  <div className="text-xs text-zinc-400 font-sans tracking-wide">
-                    THIS OFFICIAL CERTIFICATE IS PROUDLY PRESENTED TO
-                  </div>
-                </div>
-
-                {/* Student Name */}
-                <div className="py-2 border-b-2 border-amber-500/40 inline-block px-8 max-w-full">
-                  <div className="text-2xl sm:text-4xl font-black text-white tracking-wide truncate">
-                    {viewCert?.recipientName || user?.name}
-                  </div>
-                </div>
-
-                {/* Recognition Title */}
-                <div className="space-y-2 max-w-lg mx-auto font-sans">
-                  <div className="text-xs uppercase tracking-wider text-zinc-400">
-                    FOR DEMONSTRATING OUTSTANDING MASTERY AND CODING EXCELLENCE IN
-                  </div>
-                  <div className="text-lg sm:text-xl font-bold text-amber-300 font-serif">
-                    {viewCert?.title}
-                  </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    {viewCert?.description || "In recognition of consistent problem solving, algorithmic expertise, and outstanding dedication to competitive programming."}
-                  </p>
-                </div>
-
-                {/* Footer Signatures & Seals */}
-                <div className="pt-6 grid grid-cols-3 gap-4 items-end font-sans text-xs border-t border-amber-500/20">
-                  <div className="text-left space-y-1">
-                    <div className="text-[10px] text-zinc-400">ISSUE DATE</div>
-                    <div className="font-semibold text-zinc-200">
-                      {viewCert?.issueDate ? new Date(viewCert.issueDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "August 2026"}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div className="h-16 w-16 rounded-full border-2 border-dashed border-amber-500/60 bg-amber-500/10 flex items-center justify-center text-amber-400 shadow-inner">
-                      <Trophy className="h-8 w-8" />
-                    </div>
-                    <span className="text-[9px] tracking-widest text-amber-500/80 mt-1 uppercase">VERIFIED SEAL</span>
-                  </div>
-
-                  <div className="text-right space-y-1">
-                    <div className="text-[10px] text-zinc-400">VERIFICATION ID</div>
-                    <div className="font-mono font-bold text-amber-400 text-xs">
-                      {viewCert?.verificationId}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-card p-4 flex items-center justify-between rounded-b-xl border-t border-border/60">
-              <Button variant="outline" size="sm" onClick={() => setViewCert(null)}>
-                Close
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={handlePrintCertificate}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1.5"
-                >
-                  <Printer className="h-4 w-4" /> Download / Print PDF
-                </Button>
-              </div>
-            </div>
+            {viewCert && <CertificateDocument data={viewCert} showActions={true} />}
           </DialogContent>
         </Dialog>
       </div>
