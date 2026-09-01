@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Download, Printer, ExternalLink, ShieldCheck, CheckCircle2, Award, Trophy } from "lucide-react";
+import { Download, Printer, ExternalLink, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,6 +17,68 @@ export interface CertificateData {
   status?: string;
   category?: string;
   issuerName?: string;
+}
+
+export function getCertificateCitation(title: string) {
+  const t = (title || "").toLowerCase();
+  if (t.includes("winner") && !t.includes("runner")) {
+    return {
+      medal: "🥇",
+      text: (
+        <>
+          for outstanding performance and securing <strong className="text-indigo-950 font-bold">Winner</strong> in the Weekly Coding Challenges organized by the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong> in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+        </>
+      ),
+    };
+  }
+  if (t.includes("first runner")) {
+    return {
+      medal: "🥈",
+      text: (
+        <>
+          for exceptional performance and securing <strong className="text-indigo-950 font-bold">First Runner-Up</strong> in the Weekly Coding Challenges organized by the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong> in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+        </>
+      ),
+    };
+  }
+  if (t.includes("second runner")) {
+    return {
+      medal: "🥉",
+      text: (
+        <>
+          for outstanding problem solving and securing <strong className="text-indigo-950 font-bold">Second Runner-Up</strong> in the Weekly Coding Challenges organized by the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong> in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+        </>
+      ),
+    };
+  }
+  if (t.includes("excellence") || t.includes("1000") || t.includes("xp")) {
+    return {
+      medal: "⭐",
+      text: (
+        <>
+          for demonstrating excellence, algorithmic mastery, and achieving the <strong className="text-indigo-950 font-bold">1000 XP Milestone</strong> in coding challenges organized by the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong> in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+        </>
+      ),
+    };
+  }
+  if (t.includes("participant") || t.includes("participation")) {
+    return {
+      medal: "🎖️",
+      text: (
+        <>
+          for active participation, commitment, and successfully solving coding challenges organized by the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong> in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+        </>
+      ),
+    };
+  }
+  return {
+    medal: "⭐",
+    text: (
+      <>
+        for demonstrating excellence, commitment, and active contribution to the <strong className="text-indigo-900 font-bold">AI & ML Club, Chandigarh University</strong>, and for achieving a distinguished milestone in collaboration with <strong className="text-slate-900 font-bold">byteXL</strong>.
+      </>
+    ),
+  };
 }
 
 export function CertificateDocument({
@@ -36,6 +98,8 @@ export function CertificateDocument({
         year: "numeric",
       })
     : "September 2026";
+
+  const citation = getCertificateCitation(data.title);
 
   const handlePrint = () => {
     window.print();
@@ -63,11 +127,6 @@ export function CertificateDocument({
     }
   };
 
-  const isWeeklyWinner = data.title.toLowerCase().includes("winner") || data.title.toLowerCase().includes("runner");
-  const isFirst = data.title.toLowerCase().includes("winner") && !data.title.toLowerCase().includes("runner");
-  const isSecond = data.title.toLowerCase().includes("first runner");
-  const isThird = data.title.toLowerCase().includes("second runner");
-
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
       {/* Certificate Frame */}
@@ -75,11 +134,11 @@ export function CertificateDocument({
         ref={certRef}
         className="relative w-full aspect-[1.414/1] min-h-[540px] rounded-2xl p-8 sm:p-12 overflow-hidden border-4 border-indigo-500/40 shadow-2xl flex flex-col justify-between select-none text-slate-900 bg-white"
         style={{
-          background: "radial-gradient(ellipse at 50% 30%, #ffffff 0%, #f8faff 60%, #eef2ff 100%)",
+          background: "radial-gradient(ellipse at 50% 25%, #ffffff 0%, #f8faff 60%, #eef2ff 100%)",
         }}
       >
         {/* Tech Circuit Cyber Frame Corners */}
-        <div className="absolute top-0 left-0 w-32 h-32 pointer-events-none opacity-85">
+        <div className="absolute top-0 left-0 w-32 h-32 pointer-events-none opacity-80">
           <svg viewBox="0 0 100 100" className="w-full h-full text-indigo-600 fill-none stroke-current" strokeWidth="2">
             <path d="M0,20 L40,20 L60,0" />
             <path d="M0,40 L30,40 L50,20 L80,20" />
@@ -87,7 +146,7 @@ export function CertificateDocument({
             <circle cx="80" cy="20" r="3" className="fill-indigo-500 stroke-none" />
           </svg>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-85 transform rotate-90">
+        <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-80 transform rotate-90">
           <svg viewBox="0 0 100 100" className="w-full h-full text-indigo-600 fill-none stroke-current" strokeWidth="2">
             <path d="M0,20 L40,20 L60,0" />
             <path d="M0,40 L30,40 L50,20 L80,20" />
@@ -95,7 +154,7 @@ export function CertificateDocument({
             <circle cx="80" cy="20" r="3" className="fill-indigo-500 stroke-none" />
           </svg>
         </div>
-        <div className="absolute bottom-0 left-0 w-32 h-32 pointer-events-none opacity-85 transform -rotate-90">
+        <div className="absolute bottom-0 left-0 w-32 h-32 pointer-events-none opacity-80 transform -rotate-90">
           <svg viewBox="0 0 100 100" className="w-full h-full text-indigo-600 fill-none stroke-current" strokeWidth="2">
             <path d="M0,20 L40,20 L60,0" />
             <path d="M0,40 L30,40 L50,20 L80,20" />
@@ -103,7 +162,7 @@ export function CertificateDocument({
             <circle cx="80" cy="20" r="3" className="fill-indigo-500 stroke-none" />
           </svg>
         </div>
-        <div className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none opacity-85 transform rotate-180">
+        <div className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none opacity-80 transform rotate-180">
           <svg viewBox="0 0 100 100" className="w-full h-full text-indigo-600 fill-none stroke-current" strokeWidth="2">
             <path d="M0,20 L40,20 L60,0" />
             <path d="M0,40 L30,40 L50,20 L80,20" />
@@ -116,9 +175,9 @@ export function CertificateDocument({
         <div className="absolute inset-3 border-2 border-indigo-200/80 rounded-xl pointer-events-none" />
         <div className="absolute inset-5 border border-indigo-400/40 rounded-lg pointer-events-none" />
 
-        {/* 1. TOP HEADER: Chandigarh University + AI & ML Club + byteXL */}
+        {/* 1. TOP HEADER: Chandigarh University + AI & ML Club Name + byteXL */}
         <div className="relative text-center space-y-1.5 z-10 pt-2">
-          {/* Chandigarh University Badge */}
+          {/* Chandigarh University Header Badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-rose-50 border border-rose-200 shadow-sm">
             <div className="h-5 w-5 bg-red-600 text-white font-bold text-[10px] rounded flex items-center justify-center tracking-tighter">
               CU
@@ -128,21 +187,19 @@ export function CertificateDocument({
             </span>
           </div>
 
-          {/* AM AI & ML CLUB Glowing Circuit Logo */}
-          <div className="pt-1">
-            <div className="text-3xl sm:text-4xl font-black tracking-widest text-indigo-900 flex items-center justify-center gap-1 font-mono">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-indigo-600 to-blue-600 drop-shadow-sm">
-                [AM]
-              </span>
-            </div>
-            <div className="text-[11px] font-extrabold tracking-[0.35em] text-slate-800 uppercase mt-0.5">
-              AI & ML CLUB
+          {/* Clean Text-Only Name of AIML Club */}
+          <div className="pt-1.5">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-widest text-indigo-950 font-serif uppercase">
+              A-I-M-L CLUB
+            </h1>
+            <div className="text-[10px] font-bold tracking-[0.3em] text-indigo-600 uppercase mt-0.5">
+              DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING
             </div>
           </div>
 
           {/* IN ASSOCIATION WITH byteXL */}
-          <div className="pt-1 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
-            <span className="text-[9px] uppercase tracking-widest font-semibold text-slate-500">
+          <div className="pt-1.5 flex items-center justify-center gap-2 text-xs text-slate-600 font-medium">
+            <span className="text-[9px] uppercase tracking-widest font-bold text-slate-500">
               In Association With
             </span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -154,7 +211,7 @@ export function CertificateDocument({
           </div>
         </div>
 
-        {/* 2. MIDDLE SECTION: Certificate Title, Presented To, Student Name, Description */}
+        {/* 2. MIDDLE SECTION: Certificate Title, Presented To, Student Name, Citation */}
         <div className="relative text-center space-y-3 z-10 my-auto py-2">
           {/* Laurels & Dynamic Achievement Title */}
           <div className="flex items-center justify-center gap-3">
@@ -180,16 +237,9 @@ export function CertificateDocument({
             </div>
           </div>
 
-          {/* Citation Body Text */}
+          {/* Dynamic Citation Paragraph written for each title */}
           <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto leading-relaxed px-4">
-            {data.description || (
-              <>
-                for outstanding performance and securing{" "}
-                <strong className="text-indigo-950 font-semibold">{data.title}</strong> in the Weekly Coding Challenges organized by the{" "}
-                <strong className="text-indigo-900">AI & ML Club, Chandigarh University</strong> in collaboration with{" "}
-                <strong className="text-slate-900">byteXL</strong>.
-              </>
-            )}
+            {citation.text}
           </p>
         </div>
 
@@ -204,7 +254,7 @@ export function CertificateDocument({
           {/* Center: Official Medal / Stamp */}
           <div className="flex flex-col items-center">
             <div className="h-14 w-14 rounded-full border-2 border-indigo-400/80 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-white shadow-md flex items-center justify-center font-bold text-lg">
-              {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "⭐"}
+              {citation.medal}
             </div>
             <span className="text-[8px] uppercase tracking-widest text-indigo-900 font-extrabold mt-1">
               OFFICIAL CERTIFIED
