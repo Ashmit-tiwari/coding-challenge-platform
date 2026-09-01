@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Download, Printer, ExternalLink, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Download, Printer, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,6 +17,21 @@ export interface CertificateData {
   status?: string;
   category?: string;
   issuerName?: string;
+}
+
+function getCitation(title: string): string {
+  const t = (title || "").toLowerCase();
+  if (t.includes("winner") && !t.includes("runner"))
+    return "for outstanding performance and securing Winner in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+  if (t.includes("first runner"))
+    return "for exceptional performance and securing First Runner-Up in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+  if (t.includes("second runner"))
+    return "for outstanding problem-solving and securing Second Runner-Up in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+  if (t.includes("excellence") || t.includes("1000") || t.includes("xp"))
+    return "for demonstrating coding excellence, algorithmic mastery, and achieving the 1000 XP milestone in challenges organized by the A-I-M-L Club.";
+  if (t.includes("participant") || t.includes("participation"))
+    return "for active participation, commitment, and successfully solving coding challenges organized by the A-I-M-L Club.";
+  return "for demonstrating excellence, commitment, and active contribution to the A-I-M-L Club, and for achieving a distinguished milestone in their journey.";
 }
 
 export function CertificateDocument({
@@ -37,9 +52,7 @@ export function CertificateDocument({
       })
     : "September 2026";
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleDownloadImage = async () => {
     if (!certRef.current) return;
@@ -49,106 +62,152 @@ export function CertificateDocument({
       const canvas = await html2canvas(certRef.current, {
         scale: 3,
         useCORS: true,
-        backgroundColor: "#060919",
+        backgroundColor: "#ffffff",
       });
       const image = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.href = image;
-      link.download = `Certificate_${data.recipientName.replace(/\s+/g, "_")}_${data.verificationId}.png`;
+      link.download = `Certificate_${data.recipientName.replace(/\s+/g, "_")}.png`;
       link.click();
-    } catch (err) {
+    } catch {
       window.print();
     } finally {
       setDownloading(false);
     }
   };
 
+  const displayTitle = data.title.toUpperCase().includes("CERTIFICATE")
+    ? data.title
+    : `Certificate of ${data.title}`;
+
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
-      {/* Certificate Frame with Cyber Circuit Glowing Background */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* THE CERTIFICATE                                     */}
+      {/* ═══════════════════════════════════════════════════ */}
       <div
         ref={certRef}
-        className="relative w-full aspect-[1.414/1] min-h-[560px] rounded-2xl p-6 sm:p-10 overflow-hidden shadow-2xl flex flex-col justify-between select-none text-slate-900 bg-slate-950"
-        style={{
-          backgroundImage: "url('/certificates/custom-aiml-template.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }}
+        className="relative w-full aspect-[1.414/1] min-h-[560px] overflow-hidden select-none"
+        style={{ background: "#ffffff" }}
       >
-        {/* Top Header Placeholder Spacer (preserves the graphic header in template) */}
-        <div className="pt-20 sm:pt-24 text-center z-10">
-          {/* In Association with byteXL */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-sm border border-indigo-100 shadow-sm">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-slate-600">
-              In Association With
-            </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/bytexl-logo.png"
-              alt="byteXL"
-              className="h-5 sm:h-6 w-auto object-contain inline-block mix-blend-multiply"
-            />
+        {/* ── Outer navy border ── */}
+        <div className="absolute inset-0 border-[6px] border-[#1a1f5e]" />
+
+        {/* ── Inner decorative border ── */}
+        <div className="absolute inset-3 border-2 border-[#3b46a8]/40" />
+        <div className="absolute inset-5 border border-[#6673d4]/25" />
+
+        {/* ── Corner ornaments (subtle geometric) ── */}
+        {[
+          "top-6 left-6",
+          "top-6 right-6 rotate-90",
+          "bottom-6 left-6 -rotate-90",
+          "bottom-6 right-6 rotate-180",
+        ].map((pos, i) => (
+          <div key={i} className={`absolute ${pos} w-10 h-10 pointer-events-none`}>
+            <svg viewBox="0 0 40 40" className="w-full h-full">
+              <path d="M0 0 L16 0 L16 3 L3 3 L3 16 L0 16 Z" fill="#1a1f5e" />
+              <circle cx="8" cy="8" r="1.5" fill="#3b46a8" />
+            </svg>
           </div>
+        ))}
+
+        {/* ── Subtle horizontal divider lines ── */}
+        <div className="absolute top-[32%] left-12 right-12 flex items-center gap-3">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#1a1f5e]/30 to-transparent" />
+          <div className="h-2 w-2 rotate-45 bg-[#3b46a8]/40" />
+          <div className="h-2 w-2 rotate-45 bg-[#1a1f5e]/60" />
+          <div className="h-2 w-2 rotate-45 bg-[#3b46a8]/40" />
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#1a1f5e]/30 to-transparent" />
         </div>
 
-        {/* Dynamic Title / Presented To / Student Name / Citation Block */}
-        <div className="relative text-center z-10 my-auto space-y-3 px-4 sm:px-12 pt-2">
-          {/* Dynamic Achievement Title */}
-          <div className="text-xl sm:text-2xl md:text-3xl font-extrabold uppercase tracking-wider text-[#0e185f] font-serif">
-            {data.title.toUpperCase().includes("CERTIFICATE") ? data.title : `CERTIFICATE OF ${data.title.toUpperCase()}`}
-          </div>
+        {/* ── Certificate content ── */}
+        <div className="absolute inset-8 sm:inset-12 flex flex-col items-center justify-between py-6 sm:py-10 text-center">
 
-          <div className="text-xs sm:text-sm text-slate-600 font-sans tracking-wide">
-            This is proudly presented to
-          </div>
-
-          {/* Dynamic Student Name in Flowing Script Calligraphy */}
-          <div className="py-1">
-            <div
-              className="text-3xl sm:text-5xl md:text-6xl font-serif italic font-bold text-[#0c134f] tracking-wide inline-block px-8 pb-1 border-b-2 border-indigo-300 drop-shadow-sm"
-              style={{
-                fontFamily: "'Dancing Script', 'Playfair Display', 'Brush Script MT', cursive, serif",
-              }}
+          {/* ▸ TOP: Club Name — large, centered, clean ◂ */}
+          <div className="space-y-1">
+            <h1
+              className="text-3xl sm:text-4xl md:text-5xl font-black tracking-[0.2em] text-[#1a1f5e] uppercase"
+              style={{ fontFamily: "'Georgia', 'Palatino Linotype', 'Times New Roman', serif" }}
             >
-              {data.recipientName}
+              A-I-M-L CLUB
+            </h1>
+            <div className="text-[10px] sm:text-xs tracking-[0.35em] text-[#5a64b8] uppercase font-semibold">
+              Chandigarh University
             </div>
           </div>
 
-          {/* Citation Body Text */}
-          <p className="text-xs sm:text-sm text-slate-700 max-w-lg mx-auto leading-relaxed pt-1">
-            {data.description || (
-              <>
-                for demonstrating excellence, commitment, and active contribution to the{" "}
-                <strong className="text-[#0c134f] font-bold">A-I-M-L Club, Chandigarh University</strong> in collaboration with{" "}
-                <strong className="text-slate-900 font-bold">byteXL</strong>, and for achieving a distinguished milestone in their journey.
-              </>
-            )}
-          </p>
-        </div>
+          {/* ▸ MIDDLE: Title + Presented To + Name + Citation ◂ */}
+          <div className="space-y-4 w-full max-w-lg mt-2">
 
-        {/* Bottom Verification Footer */}
-        <div className="relative z-10 pb-2 px-4 sm:px-8 flex items-center justify-between text-xs text-slate-700 font-sans">
-          <div className="text-left space-y-0.5">
-            <div className="text-[9px] uppercase font-bold tracking-wider text-slate-500">Date Issued</div>
-            <div className="font-semibold text-slate-800 text-xs">{formattedDate}</div>
+            {/* Dynamic Title */}
+            <h2
+              className="text-xl sm:text-2xl md:text-3xl font-extrabold uppercase tracking-wider text-[#1a1f5e]"
+              style={{ fontFamily: "'Georgia', 'Palatino Linotype', serif" }}
+            >
+              {displayTitle}
+            </h2>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-12 h-px bg-[#1a1f5e]/30" />
+              <div className="h-1.5 w-1.5 rotate-45 bg-[#3b46a8]" />
+              <div className="w-12 h-px bg-[#1a1f5e]/30" />
+            </div>
+
+            {/* Presented to */}
+            <p
+              className="text-sm sm:text-base text-[#555] italic"
+              style={{ fontFamily: "'Georgia', serif" }}
+            >
+              This is proudly presented to
+            </p>
+
+            {/* Student Full Name */}
+            <div className="pt-1 pb-2">
+              <div
+                className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#0e1654] tracking-wide inline-block px-6 pb-2 border-b-2 border-[#3b46a8]/50"
+                style={{
+                  fontFamily: "'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive, serif",
+                  fontStyle: "italic",
+                }}
+              >
+                {data.recipientName}
+              </div>
+            </div>
+
+            {/* Citation */}
+            <p
+              className="text-xs sm:text-sm text-[#444] leading-relaxed max-w-md mx-auto"
+              style={{ fontFamily: "'Georgia', serif" }}
+            >
+              {data.description || getCitation(data.title)}
+            </p>
           </div>
 
-          <div className="text-right space-y-0.5">
-            <div className="text-[9px] uppercase font-bold tracking-wider text-slate-500">Verification ID</div>
-            <div className="font-mono font-bold text-[#0c134f] text-xs">{data.verificationId}</div>
+          {/* ▸ BOTTOM: Date only (no verification ID) ◂ */}
+          <div className="pt-4 w-full">
+            <div className="text-[10px] uppercase tracking-widest text-[#888] font-semibold">
+              Date Issued
+            </div>
+            <div
+              className="text-sm font-semibold text-[#1a1f5e] mt-0.5"
+              style={{ fontFamily: "'Georgia', serif" }}
+            >
+              {formattedDate}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Action Bar */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* ACTION BAR                                          */}
+      {/* ═══════════════════════════════════════════════════ */}
       {showActions && (
         <div className="flex items-center justify-between gap-3 p-4 bg-card border border-border/70 rounded-xl shadow-sm flex-wrap">
-          <div className="flex items-center gap-2">
-            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1 font-mono text-xs">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated by Chandigarh University, A-I-M-L Club & byteXL
-            </Badge>
-          </div>
+          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1 font-mono text-xs">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated by A-I-M-L Club
+          </Badge>
 
           <div className="flex items-center gap-2">
             <Link
@@ -156,15 +215,10 @@ export function CertificateDocument({
               target="_blank"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/70 text-xs font-medium text-foreground hover:bg-muted/80 transition-colors"
             >
-              <ExternalLink className="h-3.5 w-3.5" /> Public Verification Link
+              <ExternalLink className="h-3.5 w-3.5" /> Verify
             </Link>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              className="gap-1.5 text-xs font-semibold"
-            >
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5 text-xs font-semibold">
               <Printer className="h-4 w-4" /> Print
             </Button>
 
@@ -172,9 +226,9 @@ export function CertificateDocument({
               size="sm"
               onClick={handleDownloadImage}
               disabled={downloading}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5 text-xs shadow-sm"
+              className="bg-[#1a1f5e] hover:bg-[#141852] text-white font-semibold gap-1.5 text-xs shadow-sm"
             >
-              <Download className="h-4 w-4" /> {downloading ? "Generating HD PNG..." : "Download HD Image"}
+              <Download className="h-4 w-4" /> {downloading ? "Generating..." : "Download HD"}
             </Button>
           </div>
         </div>
