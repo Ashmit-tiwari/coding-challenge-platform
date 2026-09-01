@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { Download, Printer, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,16 +22,16 @@ export interface CertificateData {
 function getCitation(title: string): string {
   const t = (title || "").toLowerCase();
   if (t.includes("winner") && !t.includes("runner"))
-    return "for outstanding performance and securing Winner in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+    return "for outstanding performance and securing Winner in the Weekly Coding Challenges.";
   if (t.includes("first runner"))
-    return "for exceptional performance and securing First Runner-Up in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+    return "for exceptional performance and securing First Runner-Up in the Weekly Coding Challenges.";
   if (t.includes("second runner"))
-    return "for outstanding problem-solving and securing Second Runner-Up in the Weekly Coding Challenges organized by the A-I-M-L Club.";
+    return "for outstanding problem-solving and securing Second Runner-Up in the Weekly Coding Challenges.";
   if (t.includes("excellence") || t.includes("1000") || t.includes("xp"))
-    return "for demonstrating coding excellence, algorithmic mastery, and achieving the 1000 XP milestone in challenges organized by the A-I-M-L Club.";
+    return "for demonstrating coding excellence, algorithmic mastery, and achieving the 1000 XP milestone.";
   if (t.includes("participant") || t.includes("participation"))
-    return "for active participation, commitment, and successfully solving coding challenges organized by the A-I-M-L Club.";
-  return "for demonstrating excellence, commitment, and active contribution to the A-I-M-L Club, and for achieving a distinguished milestone in their journey.";
+    return "for active participation, commitment, and successfully solving coding challenges.";
+  return "for demonstrating excellence, commitment, and active contribution, and for achieving a distinguished milestone in their journey.";
 }
 
 export function CertificateDocument({
@@ -43,13 +43,19 @@ export function CertificateDocument({
 }) {
   const certRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+    link.onload = () => setFontsLoaded(true);
+    return () => { document.head.removeChild(link); };
+  }, []);
 
   const formattedDate = data.issueDate
-    ? new Date(data.issueDate).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
+    ? new Date(data.issueDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : "September 2026";
 
   const handlePrint = () => window.print();
@@ -59,21 +65,14 @@ export function CertificateDocument({
     setDownloading(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(certRef.current, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
+      const canvas = await html2canvas(certRef.current, { scale: 3, useCORS: true, backgroundColor: "#0b1026" });
       const image = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = image;
-      link.download = `Certificate_${data.recipientName.replace(/\s+/g, "_")}.png`;
-      link.click();
-    } catch {
-      window.print();
-    } finally {
-      setDownloading(false);
-    }
+      const a = document.createElement("a");
+      a.href = image;
+      a.download = `Certificate_${data.recipientName.replace(/\s+/g, "_")}.png`;
+      a.click();
+    } catch { window.print(); }
+    finally { setDownloading(false); }
   };
 
   const displayTitle = data.title.toUpperCase().includes("CERTIFICATE")
@@ -82,94 +81,121 @@ export function CertificateDocument({
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto">
-      {/* ═══════════════════════════════════════════════════ */}
-      {/* THE CERTIFICATE                                     */}
-      {/* ═══════════════════════════════════════════════════ */}
       <div
         ref={certRef}
         className="relative w-full aspect-[1.414/1] min-h-[560px] overflow-hidden select-none"
-        style={{ background: "#ffffff" }}
+        style={{ background: "linear-gradient(135deg, #0b1026 0%, #141a3a 30%, #1a2352 60%, #0f1533 100%)" }}
       >
-        {/* ── Outer navy border ── */}
-        <div className="absolute inset-0 border-[6px] border-[#1a1f5e]" />
+        {/* ── Glowing corner circuit decorations ── */}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" viewBox="0 0 1000 707">
+          {/* Top-left circuit */}
+          <path d="M0 80 L60 80 L100 40 L180 40" stroke="#4f6fff" strokeWidth="1.5" fill="none" opacity="0.5" />
+          <path d="M0 120 L40 120 L80 80 L140 80" stroke="#3b5bdb" strokeWidth="1" fill="none" opacity="0.3" />
+          <circle cx="180" cy="40" r="4" fill="#6c8aff" opacity="0.6" />
+          <circle cx="140" cy="80" r="3" fill="#4f6fff" opacity="0.4" />
+          <circle cx="100" cy="40" r="2.5" fill="#8ba4ff" opacity="0.5" />
+          {/* Top-right circuit */}
+          <path d="M1000 80 L940 80 L900 40 L820 40" stroke="#4f6fff" strokeWidth="1.5" fill="none" opacity="0.5" />
+          <path d="M1000 120 L960 120 L920 80 L860 80" stroke="#3b5bdb" strokeWidth="1" fill="none" opacity="0.3" />
+          <circle cx="820" cy="40" r="4" fill="#6c8aff" opacity="0.6" />
+          <circle cx="860" cy="80" r="3" fill="#4f6fff" opacity="0.4" />
+          {/* Bottom-left circuit */}
+          <path d="M0 627 L60 627 L100 667 L180 667" stroke="#4f6fff" strokeWidth="1.5" fill="none" opacity="0.5" />
+          <path d="M0 587 L40 587 L80 627 L140 627" stroke="#3b5bdb" strokeWidth="1" fill="none" opacity="0.3" />
+          <circle cx="180" cy="667" r="4" fill="#6c8aff" opacity="0.6" />
+          {/* Bottom-right circuit */}
+          <path d="M1000 627 L940 627 L900 667 L820 667" stroke="#4f6fff" strokeWidth="1.5" fill="none" opacity="0.5" />
+          <path d="M1000 587 L960 587 L920 627 L860 627" stroke="#3b5bdb" strokeWidth="1" fill="none" opacity="0.3" />
+          <circle cx="820" cy="667" r="4" fill="#6c8aff" opacity="0.6" />
+          {/* Glow spots */}
+          <circle cx="50" cy="50" r="60" fill="url(#glow1)" opacity="0.15" />
+          <circle cx="950" cy="50" r="60" fill="url(#glow1)" opacity="0.15" />
+          <circle cx="50" cy="657" r="60" fill="url(#glow1)" opacity="0.12" />
+          <circle cx="950" cy="657" r="60" fill="url(#glow1)" opacity="0.12" />
+          <circle cx="500" cy="353" r="200" fill="url(#glow2)" opacity="0.06" />
+          <defs>
+            <radialGradient id="glow1"><stop offset="0%" stopColor="#6c8aff" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+            <radialGradient id="glow2"><stop offset="0%" stopColor="#a5b4fc" /><stop offset="100%" stopColor="transparent" /></radialGradient>
+          </defs>
+        </svg>
 
-        {/* ── Inner decorative border ── */}
-        <div className="absolute inset-3 border-2 border-[#3b46a8]/40" />
-        <div className="absolute inset-5 border border-[#6673d4]/25" />
+        {/* ── Inner white certificate plaque ── */}
+        <div className="absolute inset-6 sm:inset-10 rounded-sm bg-white shadow-2xl" style={{ boxShadow: "0 0 60px rgba(79, 111, 255, 0.15)" }} />
 
-        {/* ── Corner ornaments (subtle geometric) ── */}
+        {/* ── Gold decorative border inside white area ── */}
+        <div className="absolute inset-8 sm:inset-12 border-2 border-amber-400/50 rounded-sm pointer-events-none" />
+        <div className="absolute inset-9 sm:inset-[52px] border border-amber-300/25 rounded-sm pointer-events-none" />
+
+        {/* ── Gold corner flourishes ── */}
         {[
-          "top-6 left-6",
-          "top-6 right-6 rotate-90",
-          "bottom-6 left-6 -rotate-90",
-          "bottom-6 right-6 rotate-180",
+          "top-9 left-9 sm:top-[52px] sm:left-[52px]",
+          "top-9 right-9 sm:top-[52px] sm:right-[52px] -scale-x-100",
+          "bottom-9 left-9 sm:bottom-[52px] sm:left-[52px] -scale-y-100",
+          "bottom-9 right-9 sm:bottom-[52px] sm:right-[52px] -scale-x-100 -scale-y-100",
         ].map((pos, i) => (
-          <div key={i} className={`absolute ${pos} w-10 h-10 pointer-events-none`}>
-            <svg viewBox="0 0 40 40" className="w-full h-full">
-              <path d="M0 0 L16 0 L16 3 L3 3 L3 16 L0 16 Z" fill="#1a1f5e" />
-              <circle cx="8" cy="8" r="1.5" fill="#3b46a8" />
+          <div key={i} className={`absolute ${pos} w-12 h-12 sm:w-16 sm:h-16 pointer-events-none`}>
+            <svg viewBox="0 0 60 60" className="w-full h-full">
+              <path d="M2 2 C2 2 2 20 2 28 C2 30 4 30 6 28 C10 22 14 14 22 10 C28 6 30 4 28 2 C20 2 2 2 2 2Z" fill="none" stroke="#c9930e" strokeWidth="1.5" opacity="0.7" />
+              <path d="M2 2 L18 2" stroke="#c9930e" strokeWidth="2" opacity="0.5" />
+              <path d="M2 2 L2 18" stroke="#c9930e" strokeWidth="2" opacity="0.5" />
+              <circle cx="5" cy="5" r="1.5" fill="#d4a418" opacity="0.6" />
             </svg>
           </div>
         ))}
 
-        {/* ── Subtle horizontal divider lines ── */}
-        <div className="absolute top-[32%] left-12 right-12 flex items-center gap-3">
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#1a1f5e]/30 to-transparent" />
-          <div className="h-2 w-2 rotate-45 bg-[#3b46a8]/40" />
-          <div className="h-2 w-2 rotate-45 bg-[#1a1f5e]/60" />
-          <div className="h-2 w-2 rotate-45 bg-[#3b46a8]/40" />
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#1a1f5e]/30 to-transparent" />
-        </div>
-
         {/* ── Certificate content ── */}
-        <div className="absolute inset-8 sm:inset-12 flex flex-col items-center justify-between py-6 sm:py-10 text-center">
+        <div className="absolute inset-10 sm:inset-16 flex flex-col items-center justify-between py-4 sm:py-8 text-center">
 
-          {/* ▸ TOP: Club Name — large, centered, clean ◂ */}
+          {/* ▸ TOP: Single header line ◂ */}
           <div className="space-y-1">
+            <p
+              className="text-[11px] sm:text-xs tracking-[0.25em] text-amber-700/80 uppercase font-semibold"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
+            >
+              Chandigarh University · AIML Club · In Association With byteXL
+            </p>
+          </div>
+
+          {/* ▸ TITLE BLOCK ◂ */}
+          <div className="space-y-5 w-full max-w-lg">
+            {/* Club Name — Big, Stylish */}
             <h1
-              className="text-3xl sm:text-4xl md:text-5xl font-black tracking-[0.2em] text-[#1a1f5e] uppercase"
-              style={{ fontFamily: "'Georgia', 'Palatino Linotype', 'Times New Roman', serif" }}
+              className="text-4xl sm:text-5xl md:text-6xl font-black text-[#1a1f5e] tracking-wider leading-tight"
+              style={{ fontFamily: "'Playfair Display', serif" }}
             >
               A-I-M-L CLUB
             </h1>
-            <div className="text-[10px] sm:text-xs tracking-[0.35em] text-[#5a64b8] uppercase font-semibold">
-              Chandigarh University
-            </div>
-          </div>
 
-          {/* ▸ MIDDLE: Title + Presented To + Name + Citation ◂ */}
-          <div className="space-y-4 w-full max-w-lg mt-2">
+            {/* Gold ornamental divider */}
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-16 sm:w-24 h-px bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-amber-500 fill-current"><path d="M12 2L15 9H21L16 14L18 21L12 17L6 21L8 14L3 9H9L12 2Z" /></svg>
+              <div className="w-16 sm:w-24 h-px bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+            </div>
 
             {/* Dynamic Title */}
             <h2
-              className="text-xl sm:text-2xl md:text-3xl font-extrabold uppercase tracking-wider text-[#1a1f5e]"
-              style={{ fontFamily: "'Georgia', 'Palatino Linotype', serif" }}
+              className="text-xl sm:text-2xl md:text-3xl font-bold uppercase tracking-widest text-[#1a1f5e]"
+              style={{ fontFamily: "'Playfair Display', serif" }}
             >
               {displayTitle}
             </h2>
 
-            {/* Divider */}
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-12 h-px bg-[#1a1f5e]/30" />
-              <div className="h-1.5 w-1.5 rotate-45 bg-[#3b46a8]" />
-              <div className="w-12 h-px bg-[#1a1f5e]/30" />
-            </div>
-
             {/* Presented to */}
             <p
-              className="text-sm sm:text-base text-[#555] italic"
-              style={{ fontFamily: "'Georgia', serif" }}
+              className="text-sm sm:text-base text-[#666] italic"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
             >
               This is proudly presented to
             </p>
 
-            {/* Student Full Name */}
-            <div className="pt-1 pb-2">
+            {/* Dynamic Student Name — Flowing Calligraphy */}
+            <div className="py-1">
               <div
-                className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#0e1654] tracking-wide inline-block px-6 pb-2 border-b-2 border-[#3b46a8]/50"
+                className="text-4xl sm:text-5xl md:text-6xl text-[#1a1f5e] inline-block px-6 pb-2"
                 style={{
-                  fontFamily: "'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive, serif",
-                  fontStyle: "italic",
+                  fontFamily: "'Great Vibes', cursive",
+                  borderBottom: "2px solid rgba(201, 147, 14, 0.4)",
                 }}
               >
                 {data.recipientName}
@@ -178,21 +204,24 @@ export function CertificateDocument({
 
             {/* Citation */}
             <p
-              className="text-xs sm:text-sm text-[#444] leading-relaxed max-w-md mx-auto"
-              style={{ fontFamily: "'Georgia', serif" }}
+              className="text-xs sm:text-sm text-[#555] leading-relaxed max-w-md mx-auto"
+              style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: "clamp(11px, 1.5vw, 15px)" }}
             >
               {data.description || getCitation(data.title)}
             </p>
           </div>
 
-          {/* ▸ BOTTOM: Date only (no verification ID) ◂ */}
-          <div className="pt-4 w-full">
-            <div className="text-[10px] uppercase tracking-widest text-[#888] font-semibold">
+          {/* ▸ BOTTOM: Date only ◂ */}
+          <div className="pt-2">
+            <div
+              className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-[#999] font-semibold"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
+            >
               Date Issued
             </div>
             <div
-              className="text-sm font-semibold text-[#1a1f5e] mt-0.5"
-              style={{ fontFamily: "'Georgia', serif" }}
+              className="text-sm sm:text-base font-semibold text-[#1a1f5e] mt-0.5"
+              style={{ fontFamily: "'Playfair Display', serif" }}
             >
               {formattedDate}
             </div>
@@ -200,15 +229,12 @@ export function CertificateDocument({
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════ */}
-      {/* ACTION BAR                                          */}
-      {/* ═══════════════════════════════════════════════════ */}
+      {/* ── Action Bar ── */}
       {showActions && (
         <div className="flex items-center justify-between gap-3 p-4 bg-card border border-border/70 rounded-xl shadow-sm flex-wrap">
           <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1 font-mono text-xs">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated by A-I-M-L Club
+            <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated
           </Badge>
-
           <div className="flex items-center gap-2">
             <Link
               href={`/verify/${data.verificationId}`}
@@ -217,11 +243,9 @@ export function CertificateDocument({
             >
               <ExternalLink className="h-3.5 w-3.5" /> Verify
             </Link>
-
             <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5 text-xs font-semibold">
               <Printer className="h-4 w-4" /> Print
             </Button>
-
             <Button
               size="sm"
               onClick={handleDownloadImage}
