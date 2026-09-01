@@ -3,32 +3,51 @@ import { getStudentSession } from "@/lib/session";
 import { ok, unauthorized } from "@/lib/api";
 import { computeLevelInfo } from "@/lib/progression";
 
-// GET /api/dashboard — student dashboard aggregate
+// GET /api/dashboard — student dashboard aggregate (Fast Parallelized)
 export async function GET() {
   const session = await getStudentSession();
   if (!session) return unauthorized("Not logged in");
-  const user = await db.user.findUnique({
-    where: { id: session.userId },
-    include: { avatar: true },
-  });
+
+  // Run all database queries concurrently in parallel
+  const [user, subs, weekly, solveLogs, recentLogs, recentAchievements] = await Promise.all([
+    db.user.findUnique({
+      where: { id: session.userId },
+      include: { avatar: true },
+    }),
+    db.submission.findMany({
+      where: { userId: session.userId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { challenge: { select: { id: true, title: true, slug: true, difficulty: true, category: true, xpReward: true } } },
+    }),
+    db.challenge.findFirst({
+      where: { isWeekly: true, status: "published" },
+      orderBy: { weekStartsAt: "desc" },
+      include: { _count: { select: { submissions: true } } },
+    }),
+    db.activityLog.findMany({
+      where: { userId: session.userId, type: "solve" },
+      select: { date: true },
+    }),
+    db.activityLog.findMany({
+      where: { userId: session.userId },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    db.userAchievement.findMany({
+      where: { userId: session.userId },
+      include: { achievement: true },
+      orderBy: { unlockedAt: "desc" },
+      take: 6,
+    }),
+  ]);
+
   if (!user) return unauthorized("User not found");
 
-  const subs = await db.submission.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    include: { challenge: { select: { id: true, title: true, slug: true, difficulty: true, category: true, xpReward: true } } },
-  });
   const solvedSubs = subs.filter((s) => s.passedAll);
   const solvedChallenges = new Set(solvedSubs.map((s) => s.challengeId));
   const successRate = subs.length === 0 ? 0 : (solvedChallenges.size / subs.length) * 100;
 
-  // weekly challenge
-  const weekly = await db.challenge.findFirst({
-    where: { isWeekly: true, status: "published" },
-    orderBy: { weekStartsAt: "desc" },
-    include: { _count: { select: { submissions: true } } },
-  });
   let weeklyUserState = null;
   if (weekly) {
     const ws = subs.filter((s) => s.challengeId === weekly.id);
@@ -39,28 +58,8 @@ export async function GET() {
     };
   }
 
-  // contribution calendar (last 365 days)
-  const solveLogs = await db.activityLog.findMany({
-    where: { userId: user.id, type: "solve" },
-    select: { date: true },
-  });
   const dateCount: Record<string, number> = {};
   for (const l of solveLogs) if (l.date) dateCount[l.date] = (dateCount[l.date] || 0) + 1;
-
-  // recent activity
-  const recentLogs = await db.activityLog.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  });
-
-  // recent achievements
-  const recentAchievements = await db.userAchievement.findMany({
-    where: { userId: user.id },
-    include: { achievement: true },
-    orderBy: { unlockedAt: "desc" },
-    take: 6,
-  });
 
   const levelInfo = computeLevelInfo(user.xp);
 

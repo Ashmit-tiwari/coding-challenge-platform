@@ -35,16 +35,19 @@ export interface UserMetrics {
 }
 
 export async function getUserMetrics(userId: string): Promise<UserMetrics | null> {
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { id: true, xp: true, currentStreak: true, longestStreak: true },
-  });
-  if (!user) return null;
+  const [user, submissions, weeklyWins] = await Promise.all([
+    db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, xp: true, currentStreak: true, longestStreak: true },
+    }),
+    db.submission.findMany({
+      where: { userId },
+      select: { challengeId: true, passedAll: true, status: true },
+    }),
+    db.weeklyWinner.count({ where: { userId } }),
+  ]);
 
-  const submissions = await db.submission.findMany({
-    where: { userId },
-    select: { challengeId: true, passedAll: true, status: true },
-  });
+  if (!user) return null;
 
   const solvedChallengeIds = new Set<string>();
   let acceptedSubmissions = 0;
@@ -57,8 +60,6 @@ export async function getUserMetrics(userId: string): Promise<UserMetrics | null
       acceptedSubmissions++;
     }
   }
-
-  const weeklyWins = await db.weeklyWinner.count({ where: { userId } });
 
   return {
     userId: user.id,
