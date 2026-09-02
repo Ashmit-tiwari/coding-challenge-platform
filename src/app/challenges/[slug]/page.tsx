@@ -337,6 +337,84 @@ function ChallengeDetail() {
   // Track which language's starter is currently loaded so we can swap when language changes
   const starterRef = useRef<Record<string, string>>({});
 
+  // Anti-cheat telemetry
+  const [tabSwitchesCount, setTabSwitchesCount] = useState(0);
+  const [pasteCount, setPasteCount] = useState(0);
+  const [totalPastedLines, setTotalPastedLines] = useState(0);
+  const [pastedLines, setPastedLines] = useState<number[]>([]);
+  const tabSwitchesRef = useRef(0);
+  const pasteEventsRef = useRef<Array<{ timestamp: string; lines: number; text: string; startLine: number; endLine: number }>>([]);
+
+  // Tab switch & Window blur detection
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        tabSwitchesRef.current += 1;
+        setTabSwitchesCount(tabSwitchesRef.current);
+      } else {
+        const count = tabSwitchesRef.current;
+        toast.warning(`⚠️ Warning: Tab switch detected! (Count: ${count})`, {
+          description: "Tab switching and clipboard activities are recorded for anti-cheat audit.",
+          duration: 4000,
+        });
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (!document.hidden) {
+        tabSwitchesRef.current += 1;
+        setTabSwitchesCount(tabSwitchesRef.current);
+        toast.warning(`⚠️ Warning: Window defocus detected! (Count: ${tabSwitchesRef.current})`, {
+          description: "Active coding window lost focus. Recorded for anti-cheat audit.",
+          duration: 3500,
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, []);
+
+  // Paste handler
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData("text");
+    if (!pastedText) return;
+
+    const ta = e.currentTarget;
+    const startPos = ta.selectionStart;
+    const textBefore = code.slice(0, startPos);
+    const startLineNumber = textBefore.split("\n").length;
+    const pastedLinesCount = pastedText.split("\n").length;
+    const endLineNumber = startLineNumber + pastedLinesCount - 1;
+
+    const newPastedLines: number[] = [];
+    for (let l = startLineNumber; l <= endLineNumber; l++) {
+      newPastedLines.push(l);
+    }
+
+    setPasteCount((prev) => prev + 1);
+    setTotalPastedLines((prev) => prev + pastedLinesCount);
+    setPastedLines((prev) => Array.from(new Set([...prev, ...newPastedLines])));
+
+    pasteEventsRef.current.push({
+      timestamp: new Date().toISOString(),
+      lines: pastedLinesCount,
+      text: pastedText.slice(0, 500),
+      startLine: startLineNumber,
+      endLine: endLineNumber,
+    });
+
+    toast.warning(`📋 Paste detected: ${pastedLinesCount} line${pastedLinesCount > 1 ? "s" : ""}`, {
+      description: `Pasted content (lines ${startLineNumber}–${endLineNumber}) is logged for code integrity audit.`,
+      duration: 4000,
+    });
+  }, [code]);
+
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [running, setRunning] = useState(false);
@@ -446,6 +524,17 @@ function ChallengeDetail() {
             challengeId: data.challenge.id,
             language,
             code,
+            tabSwitchesCount,
+            pasteCount,
+            totalPastedLines,
+            pastedLines,
+            integrityMetadata: {
+              tabSwitchesCount,
+              pasteCount,
+              totalPastedLines,
+              pastedLines,
+              pasteEvents: pasteEventsRef.current,
+            },
           }),
         });
         const json = await res.json();
@@ -586,6 +675,10 @@ function ChallengeDetail() {
               setCode={setCode}
               starterRef={starterRef}
               supportedLangs={supportedLangs}
+              tabSwitchesCount={tabSwitchesCount}
+              pasteCount={pasteCount}
+              totalPastedLines={totalPastedLines}
+              onPaste={handlePaste}
             />
 
             {/* Action bar */}
@@ -962,6 +1055,10 @@ function EditorPanel({
   setCode,
   starterRef,
   supportedLangs,
+  tabSwitchesCount = 0,
+  pasteCount = 0,
+  totalPastedLines = 0,
+  onPaste,
 }: {
   challenge: Challenge;
   language: string;
@@ -970,6 +1067,10 @@ function EditorPanel({
   setCode: (c: string) => void;
   starterRef: React.MutableRefObject<Record<string, string>>;
   supportedLangs: string[];
+  tabSwitchesCount?: number;
+  pasteCount?: number;
+  totalPastedLines?: number;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLPreElement>(null);
@@ -1070,6 +1171,16 @@ function EditorPanel({
             </TooltipTrigger>
             <TooltipContent>Reset to starter code for {LANG_LABELS[language] || language}</TooltipContent>
           </Tooltip>
+          {tabSwitchesCount > 0 && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 text-amber-600 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 font-mono">
+              ⚠️ {tabSwitchesCount} tab switch{tabSwitchesCount > 1 ? "es" : ""}
+            </Badge>
+          )}
+          {totalPastedLines > 0 && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 text-rose-600 dark:text-rose-400 border-rose-500/40 bg-rose-500/10 font-mono">
+              📋 {totalPastedLines} pasted line{totalPastedLines > 1 ? "s" : ""}
+            </Badge>
+          )}
           <span className="text-[10px] text-muted-foreground ml-1 font-mono tabular-nums">
             {charCount} chars
           </span>
@@ -1094,6 +1205,7 @@ function EditorPanel({
           onChange={(e) => setCode(e.target.value)}
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
+          onPaste={onPaste}
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"

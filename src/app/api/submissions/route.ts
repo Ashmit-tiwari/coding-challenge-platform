@@ -16,13 +16,31 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized("Not logged in");
   if (session.role !== "student") return forbidden("Students only");
 
-  let body: { challengeId?: string; language?: string; code?: string };
+  let body: {
+    challengeId?: string;
+    language?: string;
+    code?: string;
+    tabSwitchesCount?: number;
+    pasteCount?: number;
+    totalPastedLines?: number;
+    pastedLines?: number[];
+    integrityMetadata?: any;
+  };
   try {
     body = await req.json();
   } catch {
     return fail("Invalid JSON body");
   }
-  const { challengeId, language, code } = body;
+  const {
+    challengeId,
+    language,
+    code,
+    tabSwitchesCount = 0,
+    pasteCount = 0,
+    totalPastedLines = 0,
+    pastedLines = [],
+    integrityMetadata = null,
+  } = body;
   if (!challengeId || !language || !code) return fail("challengeId, language and code are required");
   const lang = language.toLowerCase();
   if (!["python", "py", "javascript", "js", "cpp", "c++", "c", "java"].includes(lang)) {
@@ -145,6 +163,11 @@ export async function POST(req: NextRequest) {
       fingerprint: fp,
       firstAttempt,
       xpAwarded: 0,
+      tabSwitchesCount: Number(tabSwitchesCount) || 0,
+      pasteCount: Number(pasteCount) || 0,
+      totalPastedLines: Number(totalPastedLines) || 0,
+      pastedLines: Array.isArray(pastedLines) ? JSON.stringify(pastedLines) : null,
+      integrityMetadata: integrityMetadata ? JSON.stringify(integrityMetadata) : null,
     },
   });
 

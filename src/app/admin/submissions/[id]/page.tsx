@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, FileCode2, Loader2, Star, Fingerprint, Clock, Zap, Trophy, Calendar,
   CheckCircle2, XCircle, AlertCircle, Eye, EyeOff, User, Code2, Award,
+  AlertTriangle, Copy, ShieldAlert, Sparkles, Check,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin-shell";
 import { AvatarSvg } from "@/components/avatar-svg";
@@ -16,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   statusColor, yearBadge, yearLabel, langLabel, fmtMs, fmtDateTime, relTime, shortId,
@@ -50,14 +53,31 @@ interface SubmissionDetail {
   firstAttempt: boolean;
   xpAwarded: number;
   fingerprint?: string | null;
+  tabSwitchesCount?: number;
+  pasteCount?: number;
+  totalPastedLines?: number;
+  pastedLines?: number[];
+  integrityMetadata?: any;
   runtimeDetail: RuntimeTest[];
   createdAt: string;
   user: SubmissionUser;
   challenge: SubmissionChallenge;
 }
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
+function CodeBlock({
+  code,
+  language,
+  pastedLines = [],
+  highlightPasted = true,
+}: {
+  code: string;
+  language: string;
+  pastedLines?: number[];
+  highlightPasted?: boolean;
+}) {
   const lang = (language || "python").toLowerCase();
+  const pastedSet = useMemo(() => new Set(pastedLines || []), [pastedLines]);
+
   return (
     <div className="rounded-lg overflow-hidden border border-border/60">
       <div className="max-h-[640px] overflow-auto custom-scrollbar bg-[#1e1e1e]">
@@ -72,7 +92,24 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
             background: "#1e1e1e",
             fontFamily: "var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
           }}
-          lineNumberStyle={{ color: "#6b7280", paddingRight: "16px", userSelect: "none" }}
+          lineNumberStyle={(lineNumber: number) => ({
+            color: highlightPasted && pastedSet.has(lineNumber) ? "#f87171" : "#6b7280",
+            fontWeight: highlightPasted && pastedSet.has(lineNumber) ? "bold" : "normal",
+            paddingRight: "16px",
+            userSelect: "none",
+          })}
+          lineProps={(lineNumber: number) => {
+            const isPasted = highlightPasted && pastedSet.has(lineNumber);
+            return {
+              style: {
+                display: "block",
+                backgroundColor: isPasted ? "rgba(239, 68, 68, 0.22)" : "transparent",
+                borderLeft: isPasted ? "4px solid #ef4444" : "4px solid transparent",
+                paddingLeft: "8px",
+                position: "relative",
+              },
+            };
+          }}
           wrapLongLines
         >
           {code || "// empty submission"}
@@ -87,6 +124,7 @@ export default function SubmissionInspectorPage() {
   const id = (params?.id as string) || "";
   const [data, setData] = useState<SubmissionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [highlightPasted, setHighlightPasted] = useState(true);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -111,6 +149,7 @@ export default function SubmissionInspectorPage() {
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
 
   const tests = useMemo<RuntimeTest[]>(() => data?.runtimeDetail || [], [data]);
+  const hasIntegrityFlags = (data?.tabSwitchesCount || 0) > 0 || (data?.pasteCount || 0) > 0;
 
   return (
     <AdminGuard>
@@ -178,115 +217,167 @@ export default function SubmissionInspectorPage() {
                     <Badge variant="outline">{data.firstAttempt ? "First attempt" : "Retake"}</Badge>
                     {data.isFinal && <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-500/30"><Star className="h-3 w-3 mr-1" /> Final</Badge>}
                     {data.fingerprint && (
-                      <Badge variant="outline" className="font-mono text-[10px]"><Fingerprint className="h-3 w-3 mr-1" /> {shortId(data.fingerprint, 12)}</Badge>
+                      <Badge variant="outline" className="font-mono text-[10px] text-muted-foreground">
+                        <Fingerprint className="h-3 w-3 mr-1" /> fp:{data.fingerprint.slice(0, 10)}
+                      </Badge>
                     )}
-                    <Badge variant="outline"><Calendar className="h-3 w-3 mr-1" /> {fmtDateTime(data.createdAt)}</Badge>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-              {/* Code */}
-              <div className="lg:col-span-3 space-y-3">
-                <Card className="border-border/60">
-                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Code2 className="h-4 w-4 text-primary" /> Submitted code
-                    </CardTitle>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      {data.code ? data.code.split("\n").length : 0} lines · {data.language}
+            {/* ANTI-CHEAT & CODE INTEGRITY TELEMETRY CARD */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+              <Card className={cn(
+                "border overflow-hidden",
+                hasIntegrityFlags ? "border-amber-500/50 bg-amber-500/5" : "border-border/60"
+              )}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className={cn("h-4 w-4", hasIntegrityFlags ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")} />
+                      <CardTitle className="text-sm font-semibold">Code Integrity & Anti-Cheat Telemetry</CardTitle>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <CodeBlock code={data.code} language={data.language} />
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Test results */}
-              <div className="lg:col-span-2 space-y-3">
-                <Card className="border-border/60">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Award className="h-4 w-4 text-primary" /> Test case results
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {data.passedCount}/{data.totalTests} passed
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    {tests.length === 0 ? (
-                      <div className="text-xs text-muted-foreground py-6 text-center">
-                        No per-test runtime detail recorded.
-                      </div>
+                    {hasIntegrityFlags ? (
+                      <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">
+                        ⚠️ Suspicious Activity Logged
+                      </Badge>
                     ) : (
-                      <div className="space-y-2 max-h-[640px] overflow-y-auto custom-scrollbar pr-1">
-                        {tests.map((t, i) => {
-                          const passed = !!t.passed;
-                          return (
-                            <div key={i} className={cn(
-                              "rounded-lg border p-3 text-xs",
-                              passed ? "border-emerald-500/30 bg-emerald-500/5" : "border-rose-500/30 bg-rose-500/5",
-                            )}>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  {passed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
-                                  <span className="font-medium">{t.name || `Test ${i + 1}`}</span>
-                                  {t.hidden ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground px-1 py-px rounded bg-muted/40">
-                                      <EyeOff className="h-2.5 w-2.5" /> hidden
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground px-1 py-px rounded bg-muted/40">
-                                      <Eye className="h-2.5 w-2.5" /> visible
-                                    </span>
-                                  )}
-                                  {t.isSample && (
-                                    <span className="text-[10px] text-amber-700 dark:text-amber-400 px-1 py-px rounded bg-amber-500/15 border border-amber-500/30">sample</span>
-                                  )}
-                                </div>
-                                {typeof t.execMs === "number" && (
-                                  <span className="text-[10px] text-muted-foreground tabular-nums">{fmtMs(t.execMs)}</span>
-                                )}
-                              </div>
-                              {!passed && (t.stderr || t.actual || t.expected) && (
-                                <div className="mt-2 space-y-1.5 font-mono text-[11px]">
-                                  {t.expected && (
-                                    <div>
-                                      <span className="text-muted-foreground">expected:</span>
-                                      <pre className="whitespace-pre-wrap bg-muted/30 rounded p-1.5 mt-0.5">{t.expected}</pre>
-                                    </div>
-                                  )}
-                                  {t.actual && (
-                                    <div>
-                                      <span className="text-muted-foreground">actual:</span>
-                                      <pre className="whitespace-pre-wrap bg-rose-500/10 rounded p-1.5 mt-0.5">{t.actual}</pre>
-                                    </div>
-                                  )}
-                                  {t.stderr && (
-                                    <div>
-                                      <span className="text-muted-foreground">stderr:</span>
-                                      <pre className="whitespace-pre-wrap bg-rose-500/10 rounded p-1.5 mt-0.5 text-rose-700 dark:text-rose-300">{t.stderr}</pre>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              {passed && t.stdout && (
-                                <div className="mt-2 font-mono text-[11px]">
-                                  <span className="text-muted-foreground">stdout:</span>
-                                  <pre className="whitespace-pre-wrap bg-muted/30 rounded p-1.5 mt-0.5">{t.stdout}</pre>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs">
+                        ✓ Clean Session
+                      </Badge>
                     )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                  </div>
+                  <CardDescription className="text-xs">
+                    Live telemetry recorded while the participant wrote and submitted this solution.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className={cn(
+                      "p-3 rounded-lg border flex flex-col justify-between",
+                      (data.tabSwitchesCount || 0) > 0 ? "bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200" : "bg-muted/30 border-border/60"
+                    )}>
+                      <div className="text-xs text-muted-foreground">Tab / Window Switches</div>
+                      <div className="text-xl font-bold flex items-center gap-1.5 mt-1">
+                        {(data.tabSwitchesCount || 0) > 0 ? "⚠️" : "✓"} {data.tabSwitchesCount || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {(data.tabSwitchesCount || 0) > 0 ? "Participant navigated away during solving" : "No tab switching detected"}
+                      </div>
+                    </div>
+
+                    <div className={cn(
+                      "p-3 rounded-lg border flex flex-col justify-between",
+                      (data.pasteCount || 0) > 0 ? "bg-rose-500/10 border-rose-500/40 text-rose-900 dark:text-rose-200" : "bg-muted/30 border-border/60"
+                    )}>
+                      <div className="text-xs text-muted-foreground">Paste Events</div>
+                      <div className="text-xl font-bold flex items-center gap-1.5 mt-1">
+                        {(data.pasteCount || 0) > 0 ? "📋" : "✓"} {data.pasteCount || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {(data.pasteCount || 0) > 0 ? `${data.pasteCount} clipboard paste event(s)` : "No external pastes detected"}
+                      </div>
+                    </div>
+
+                    <div className={cn(
+                      "p-3 rounded-lg border flex flex-col justify-between",
+                      (data.totalPastedLines || 0) > 0 ? "bg-rose-500/10 border-rose-500/40 text-rose-900 dark:text-rose-200" : "bg-muted/30 border-border/60"
+                    )}>
+                      <div className="text-xs text-muted-foreground">Total Pasted Lines</div>
+                      <div className="text-xl font-bold flex items-center gap-1.5 mt-1">
+                        {(data.totalPastedLines || 0) > 0 ? "🔴" : "✓"} {data.totalPastedLines || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {(data.totalPastedLines || 0) > 0 ? "Highlighted in RED below in code editor" : "100% typed manually in editor"}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Code */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileCode2 className="h-4 w-4 text-primary" /> Submitted Code
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Exact source code evaluated by the judge runner.
+                  </CardDescription>
+                </div>
+
+                {/* Red Highlight Toggle */}
+                {(data.totalPastedLines || 0) > 0 && (
+                  <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs">
+                    <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                    <Label htmlFor="highlight-switch" className="text-xs font-semibold text-rose-700 dark:text-rose-300 cursor-pointer">
+                      Highlight Pasted Lines in RED ({data.totalPastedLines} lines)
+                    </Label>
+                    <Switch
+                      id="highlight-switch"
+                      checked={highlightPasted}
+                      onCheckedChange={setHighlightPasted}
+                    />
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="pt-0">
+                <CodeBlock
+                  code={data.code}
+                  language={data.language}
+                  pastedLines={data.pastedLines || []}
+                  highlightPasted={highlightPasted}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Test case breakdown */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Test Case Results ({data.passedCount}/{data.totalTests} passed)</CardTitle>
+                <CardDescription className="text-xs">Detailed per-test output, execution time, and error streams.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {tests.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">No per-test runtime details available.</div>
+                ) : (
+                  tests.map((t, idx) => (
+                    <div key={idx} className={cn("p-3 rounded-lg border text-xs space-y-2", t.passed ? "bg-emerald-500/5 border-emerald-500/30" : "bg-rose-500/5 border-rose-500/30")}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          {t.passed ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
+                          {t.name || `Test ${idx + 1}`}
+                          {t.hidden && <Badge variant="secondary" className="text-[10px]">Hidden</Badge>}
+                          {t.isSample && <Badge variant="outline" className="text-[10px]">Sample</Badge>}
+                        </span>
+                        <span className="text-muted-foreground text-[11px] font-mono">{t.execMs ? fmtMs(t.execMs) : ""}</span>
+                      </div>
+                      {t.expected !== undefined && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 font-mono text-[11px] pt-1">
+                          <div className="bg-background/80 p-2 rounded border border-border/60">
+                            <div className="text-[10px] text-muted-foreground uppercase font-sans mb-1">Expected</div>
+                            <pre className="overflow-x-auto whitespace-pre-wrap">{t.expected || "<empty>"}</pre>
+                          </div>
+                          <div className="bg-background/80 p-2 rounded border border-border/60">
+                            <div className="text-[10px] text-muted-foreground uppercase font-sans mb-1">Actual</div>
+                            <pre className="overflow-x-auto whitespace-pre-wrap">{t.actual || t.stdout || "<empty>"}</pre>
+                          </div>
+                        </div>
+                      )}
+                      {t.stderr && (
+                        <div className="bg-background/80 p-2 rounded border border-rose-500/30 font-mono text-[11px] text-rose-600 dark:text-rose-400">
+                          <div className="text-[10px] text-muted-foreground uppercase font-sans mb-1">Stderr</div>
+                          <pre className="overflow-x-auto whitespace-pre-wrap">{t.stderr}</pre>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

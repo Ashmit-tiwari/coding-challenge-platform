@@ -159,6 +159,13 @@ model Submission {
   xpAwarded     Int      @default(0)
   firstAttempt  Boolean  @default(false) // true if solved on first attempt
 
+  // Anti-Cheat & Integrity Telemetry
+  tabSwitchesCount  Int      @default(0)
+  pasteCount        Int      @default(0)
+  totalPastedLines  Int      @default(0)
+  pastedLines       String?  // JSON array of line numbers e.g. "[2, 3, 4]"
+  integrityMetadata String?  // JSON array of paste events and blur telemetry
+
   plagiarismA   PlagiarismFlag[] @relation("FlagSubA")
   plagiarismB   PlagiarismFlag[] @relation("FlagSubB")
   winningWins   WeeklyWinner[]

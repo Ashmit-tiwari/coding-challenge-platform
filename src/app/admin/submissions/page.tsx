@@ -39,6 +39,9 @@ interface SubmissionRow {
   xpAwarded: number;
   isFinal: boolean;
   fingerprint?: string | null;
+  tabSwitchesCount?: number;
+  pasteCount?: number;
+  totalPastedLines?: number;
   createdAt: string;
 }
 
@@ -153,6 +156,7 @@ function SubmissionsContent() {
                   <TableHead className="font-medium">Challenge</TableHead>
                   <TableHead className="font-medium">Lang</TableHead>
                   <TableHead className="font-medium">Status</TableHead>
+                  <TableHead className="font-medium">Integrity</TableHead>
                   <TableHead className="font-medium text-right">Passed</TableHead>
                   <TableHead className="font-medium text-right">Attempt</TableHead>
                   <TableHead className="font-medium text-right">Time</TableHead>
@@ -215,6 +219,24 @@ function SubmissionsContent() {
                       <span className={cn("text-[11px] px-1.5 py-0.5 rounded border", statusColor(s.status))}>
                         {s.status}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {(s.tabSwitchesCount || 0) > 0 || (s.totalPastedLines || 0) > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {(s.tabSwitchesCount || 0) > 0 && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/10 whitespace-nowrap">
+                              ⚠️ {s.tabSwitchesCount} tab{s.tabSwitchesCount > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          {(s.totalPastedLines || 0) > 0 && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-rose-700 dark:text-rose-300 border-rose-500/40 bg-rose-500/10 whitespace-nowrap">
+                              🔴 {s.totalPastedLines}p lines
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">Clean</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums">
                       <span className={s.passedAll ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>

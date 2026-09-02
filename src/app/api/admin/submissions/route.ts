@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
       xpAwarded: s.xpAwarded,
       isFinal: s.isFinal,
       fingerprint: s.fingerprint,
+      tabSwitchesCount: s.tabSwitchesCount ?? 0,
+      pasteCount: s.pasteCount ?? 0,
+      totalPastedLines: s.totalPastedLines ?? 0,
       createdAt: s.createdAt,
     })),
   });
