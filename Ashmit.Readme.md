@@ -1,7 +1,9 @@
 <div align="center">
 
   <!-- HERO BANNER -->
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,2,5,30&height=220&section=header&text=Ashmit%20Tiwari&fontSize=42&fontAlignY=38&desc=AI%20%26%20Machine%20Learning%20Engineering%20%E2%80%A2%20Full-Stack%20Developer%20%E2%80%A2%20Builder&descFontSize=16&descAlignY=62&fontColor=ffffff&descColor=a5b4fc" width="100%" alt="Ashmit Tiwari Banner" />
+  <img src="./ashmit_banner.jpg" width="100%" alt="Ashmit Tiwari — AI & ML Engineer • Full-Stack Developer • Builder" />
+
+  <br /><br />
 
   <!-- DYNAMIC TYPING HEADER -->
   <a href="https://github.com/Ashmit-tiwari">
