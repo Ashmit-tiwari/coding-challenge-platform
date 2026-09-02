@@ -4,15 +4,15 @@
   <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,2,5,30&height=220&section=header&text=Ashmit%20Tiwari&fontSize=42&fontAlignY=38&desc=AI%20%26%20Machine%20Learning%20Engineering%20%E2%80%A2%20Full-Stack%20Developer%20%E2%80%A2%20Builder&descFontSize=16&descAlignY=62&fontColor=ffffff&descColor=a5b4fc" width="100%" alt="Ashmit Tiwari Banner" />
 
   <!-- DYNAMIC TYPING HEADER -->
-  <a href="https://github.com/YOUR_GITHUB_USERNAME">
+  <a href="https://github.com/Ashmit-tiwari">
     <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&duration=3000&pause=1000&color=A78BFA&center=true&vCenter=true&width=650&lines=Building+Scalable+Full-Stack+Web+Applications;AI+%26+Machine+Learning+Engineering;Turning+Complex+Algorithms+Into+Working+Products;Continuous+Problem+Solving+%26+Engineering" alt="Typing SVG" />
   </a>
 
   <p align="center">
-    <a href="mailto:YOUR_EMAIL"><img src="https://img.shields.io/badge/Email-YOUR__EMAIL-4f46e5?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" /></a>
-    <a href="https://linkedin.com/in/YOUR_LINKEDIN_URL"><img src="https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
-    <a href="https://YOUR_PORTFOLIO_URL"><img src="https://img.shields.io/badge/Portfolio-Visit%20Site-8b5cf6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Portfolio" /></a>
-    <a href="https://github.com/YOUR_GITHUB_USERNAME"><img src="https://img.shields.io/badge/GitHub-Follow-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
+    <a href="mailto:ashmittiwwari@gmail.com"><img src="https://img.shields.io/badge/Email-ashmittiwwari%40gmail.com-4f46e5?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" /></a>
+    <a href="https://www.linkedin.com/in/ashmit-tiwari-726098319" target="_blank"><img src="https://img.shields.io/badge/LinkedIn-Ashmit%20Tiwari-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
+    <a href="https://www.instagram.com/ashmit_tiwari_2911" target="_blank"><img src="https://img.shields.io/badge/Instagram-ashmit__tiwari__2911-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
+    <a href="https://github.com/Ashmit-tiwari"><img src="https://img.shields.io/badge/GitHub-Ashmit--tiwari-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
   </p>
 
 </div>
@@ -124,51 +124,51 @@ graph LR
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3 align="left">🚀 Project One — Full-Stack Application</h3>
-      <p>A full-featured web platform with authentication, interactive UI, and backend database integrations.</p>
+      <h3 align="left">🚀 Coding Challenge Platform</h3>
+      <p>Full-stack competitive coding platform with automated test runners, achievement certificates, leaderboard, and anti-cheat tracking.</p>
       <p>
         <img src="https://img.shields.io/badge/Next.js-000?style=flat-square&logo=next.js" alt="Next.js" />
         <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
         <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
       </p>
       <p>
-        <a href="https://github.com/YOUR_GITHUB_USERNAME/PROJECT_REPO_1"><b>View Repository →</b></a>
+        <a href="https://github.com/Ashmit-tiwari/coding-challenge-platform" target="_blank"><b>View Repository →</b></a>
       </p>
     </td>
     <td width="50%" valign="top">
-      <h3 align="left">🧠 Project Two — AI / ML System</h3>
-      <p>Machine learning project focused on data processing, exploratory analysis, and predictive model training.</p>
+      <h3 align="left">🧠 Applied AI / ML Systems</h3>
+      <p>Machine learning experiments exploring data preprocessing, exploratory data analysis, and predictive model training.</p>
       <p>
         <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
         <img src="https://img.shields.io/badge/NumPy-013243?style=flat-square&logo=numpy&logoColor=white" alt="NumPy" />
         <img src="https://img.shields.io/badge/Scikit--Learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white" alt="Scikit-Learn" />
       </p>
       <p>
-        <a href="https://github.com/YOUR_GITHUB_USERNAME/PROJECT_REPO_2"><b>View Repository →</b></a>
+        <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
       </p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3 align="left">⚙️ Project Three — Developer Tool / Utility</h3>
-      <p>Command-line tool or backend utility designed to automate repetitive workflows and streamline productivity.</p>
+      <h3 align="left">⚙️ Developer Tools & Utilities</h3>
+      <p>Command-line utilities and automation tools designed to optimize developer workflow and problem solving.</p>
       <p>
         <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
         <img src="https://img.shields.io/badge/REST_API-6366f1?style=flat-square" alt="API" />
       </p>
       <p>
-        <a href="https://github.com/YOUR_GITHUB_USERNAME/PROJECT_REPO_3"><b>View Repository →</b></a>
+        <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
       </p>
     </td>
     <td width="50%" valign="top">
-      <h3 align="left">🌐 Project Four — Modern Web Project</h3>
-      <p>Responsive frontend interface with clean design systems, state management, and modern developer ergonomics.</p>
+      <h3 align="left">🌐 Modern Web Applications</h3>
+      <p>Responsive, interactive frontend applications with clean UI design systems and state management.</p>
       <p>
         <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
         <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind" />
       </p>
       <p>
-        <a href="https://github.com/YOUR_GITHUB_USERNAME/PROJECT_REPO_4"><b>View Repository →</b></a>
+        <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
       </p>
     </td>
   </tr>
@@ -182,15 +182,15 @@ graph LR
   <table border="0">
     <tr>
       <td align="center">
-        <img src="https://github-readme-stats.vercel.app/api?username=YOUR_GITHUB_USERNAME&show_icons=true&theme=tokyonight&hide_border=true&bg_color=0b0f19&title_color=a78bfa&icon_color=60a5fa&text_color=e2e8f0" alt="Ashmit's GitHub Stats" />
+        <img src="https://github-readme-stats.vercel.app/api?username=Ashmit-tiwari&show_icons=true&theme=tokyonight&hide_border=true&bg_color=0b0f19&title_color=a78bfa&icon_color=60a5fa&text_color=e2e8f0" alt="Ashmit's GitHub Stats" />
       </td>
       <td align="center">
-        <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=YOUR_GITHUB_USERNAME&layout=compact&theme=tokyonight&hide_border=true&bg_color=0b0f19&title_color=a78bfa&text_color=e2e8f0" alt="Top Languages" />
+        <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Ashmit-tiwari&layout=compact&theme=tokyonight&hide_border=true&bg_color=0b0f19&title_color=a78bfa&text_color=e2e8f0" alt="Top Languages" />
       </td>
     </tr>
     <tr>
       <td colspan="2" align="center">
-        <img src="https://github-readme-streak-stats.herokuapp.com/?user=YOUR_GITHUB_USERNAME&theme=tokyonight&hide_border=true&background=0b0f19&ring=8b5cf6&fire=ec4899&currStreakLabel=a78bfa" alt="GitHub Streak" />
+        <img src="https://github-readme-streak-stats.herokuapp.com/?user=Ashmit-tiwari&theme=tokyonight&hide_border=true&background=0b0f19&ring=8b5cf6&fire=ec4899&currStreakLabel=a78bfa" alt="GitHub Streak" />
       </td>
     </tr>
   </table>
@@ -200,9 +200,9 @@ graph LR
 
 ### 🏆 Achievements & Certifications
 
-* 📜 **Certification / Coursework Title** — *Issuing Organization / Platform* `[Year]`
-* 🏅 **Coding Milestone / Hackathon Participation** — *Organization / Event* `[Year]`
-* 🎯 **Academic & Technical Achievement** — *Chandigarh University* `[Year]`
+* 📜 **B.Tech Artificial Intelligence & Machine Learning** — *Chandigarh University*
+* 🏅 **Coding Challenge Platform Architect** — *AIML Club & byteXL Integration*
+* 🎯 **Algorithmic Problem Solving & Data Structures** — *Continuous Practice*
 
 ---
 
@@ -230,17 +230,17 @@ I am open to collaborating on:
 
 <div align="center">
 
-  <a href="mailto:YOUR_EMAIL">
-    <img src="https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail" />
+  <a href="mailto:ashmittiwwari@gmail.com">
+    <img src="https://img.shields.io/badge/Gmail-ashmittiwwari%40gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail" />
   </a>
-  <a href="https://linkedin.com/in/YOUR_LINKEDIN_URL">
-    <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
+  <a href="https://www.linkedin.com/in/ashmit-tiwari-726098319" target="_blank">
+    <img src="https://img.shields.io/badge/LinkedIn-Ashmit%20Tiwari-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
   </a>
-  <a href="https://github.com/YOUR_GITHUB_USERNAME">
-    <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
+  <a href="https://www.instagram.com/ashmit_tiwari_2911" target="_blank">
+    <img src="https://img.shields.io/badge/Instagram-%40ashmit__tiwari__2911-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" />
   </a>
-  <a href="https://YOUR_PORTFOLIO_URL">
-    <img src="https://img.shields.io/badge/Personal_Portfolio-8b5cf6?style=for-the-badge&logo=about-dot-me&logoColor=white" alt="Portfolio" />
+  <a href="https://github.com/Ashmit-tiwari">
+    <img src="https://img.shields.io/badge/GitHub-Ashmit--tiwari-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
   </a>
 
 </div>
