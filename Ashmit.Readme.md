@@ -126,48 +126,26 @@ graph LR
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3 align="left">🚀 Coding Challenge Platform</h3>
-      <p>Full-stack competitive coding platform with automated test runners, achievement certificates, leaderboard, and anti-cheat tracking.</p>
+      <h3 align="left">⚡ Coding Challenge Platform</h3>
+      <p>Full-stack competitive programming platform with automated test runners, dynamic certification engine, leaderboard, and live anti-cheat integrity monitoring.</p>
       <p>
         <img src="https://img.shields.io/badge/Next.js-000?style=flat-square&logo=next.js" alt="Next.js" />
         <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
         <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+        <img src="https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white" alt="Prisma" />
       </p>
       <p>
         <a href="https://github.com/Ashmit-tiwari/coding-challenge-platform" target="_blank"><b>View Repository →</b></a>
       </p>
     </td>
     <td width="50%" valign="top">
-      <h3 align="left">🧠 Applied AI / ML Systems</h3>
-      <p>Machine learning experiments exploring data preprocessing, exploratory data analysis, and predictive model training.</p>
-      <p>
-        <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
-        <img src="https://img.shields.io/badge/NumPy-013243?style=flat-square&logo=numpy&logoColor=white" alt="NumPy" />
-        <img src="https://img.shields.io/badge/Scikit--Learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white" alt="Scikit-Learn" />
-      </p>
-      <p>
-        <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
-      </p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3 align="left">⚙️ Developer Tools & Utilities</h3>
-      <p>Command-line utilities and automation tools designed to optimize developer workflow and problem solving.</p>
-      <p>
-        <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
-        <img src="https://img.shields.io/badge/REST_API-6366f1?style=flat-square" alt="API" />
-      </p>
-      <p>
-        <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
-      </p>
-    </td>
-    <td width="50%" valign="top">
-      <h3 align="left">🌐 Modern Web Applications</h3>
-      <p>Responsive, interactive frontend applications with clean UI design systems and state management.</p>
+      <h3 align="left">🌐 Elevate — Social Media Platform</h3>
+      <p>Modern social networking platform designed for seamless user interaction, dynamic content feeds, profiles, and responsive real-time engagement.</p>
       <p>
         <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
-        <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind" />
+        <img src="https://img.shields.io/badge/Next.js-000?style=flat-square&logo=next.js" alt="Next.js" />
+        <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
+        <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase" />
       </p>
       <p>
         <a href="https://github.com/Ashmit-tiwari" target="_blank"><b>View Repository →</b></a>
