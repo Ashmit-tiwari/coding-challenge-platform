@@ -221,7 +221,6 @@ function LeaderboardContent() {
   }, [scope, period, fetchData]);
 
   const myRow = useMemo(
-    () => (data?.leaderboard || []).find((r) => r.isMe) || null,
     () => (data?.leaderboard || []).find((r) => r.isMe || (r as any).isCurrentUser) || (data as any)?.currentUser || null,
     [data],
   );
