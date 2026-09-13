@@ -55,7 +55,7 @@ interface RunOpts {
 }
 
 // ---------------------------------------------------------------------------
-// Core subprocess runner with improved error detection
+// Core subprocess runner with accurate binary detection
 // ---------------------------------------------------------------------------
 function runSubprocess(
   cmd: string,
@@ -73,7 +73,7 @@ function runSubprocess(
     try {
       proc = spawn(cmd, args, {
         cwd: opts.cwd,
-        shell: process.platform === "win32",
+        shell: false,
         stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
@@ -112,6 +112,7 @@ function runSubprocess(
       if (finished) return;
       finished = true;
       clearTimeout(timer);
+      const isNotFound = /ENOENT|not found/i.test(err.message) || (err as any).code === "ENOENT";
       resolve({
         stdout,
         stderr: stderr || err.message,
@@ -119,7 +120,7 @@ function runSubprocess(
         timedOut: false,
         execTimeMs: Date.now() - start,
         error: err.message,
-        commandNotFound: /ENOENT|not found/i.test(err.message),
+        commandNotFound: isNotFound,
       });
     });
 
@@ -128,9 +129,8 @@ function runSubprocess(
       finished = true;
       clearTimeout(timer);
       const execTimeMs = Date.now() - start;
-      // Detect "command not found" patterns in stderr on Windows
-      const notFoundPattern = /is not recognized|cannot find|not found|not operable|No such file|ENOENT/i;
-      const isCommandNotFound = notFoundPattern.test(stderr) && (code === 1 || code === 9009);
+      const notFoundPattern = /is not recognized as an internal or external command|cannot find the (file|path)|not found|The system cannot find the file specified/i;
+      const isCommandNotFound = notFoundPattern.test(stderr) && (code === 1 || code === 9009 || code === -4058);
       resolve({
         stdout,
         stderr,
@@ -153,38 +153,44 @@ function runSubprocess(
 }
 
 // ---------------------------------------------------------------------------
-// Piston API Cloud Runner (replaces Wandbox — faster, more reliable, more languages)
-// https://emkc.org/api/v2/piston/execute
+// Cloud Sandbox Runner (Judge0 CE public API with automated fallback)
 // ---------------------------------------------------------------------------
-const PISTON_LANGUAGES: Record<string, { language: string; version: string }> = {
-  python:     { language: "python",     version: "3.12.0" },
-  py:         { language: "python",     version: "3.12.0" },
-  python3:    { language: "python",     version: "3.12.0" },
-  javascript: { language: "javascript", version: "18.15.0" },
-  js:         { language: "javascript", version: "18.15.0" },
-  node:       { language: "javascript", version: "18.15.0" },
-  cpp:        { language: "c++",        version: "10.2.0" },
-  "c++":      { language: "c++",        version: "10.2.0" },
-  c:          { language: "c",          version: "10.2.0" },
-  java:       { language: "java",       version: "15.0.2" },
+const JUDGE0_LANGUAGES: Record<string, number> = {
+  python:     71, // Python (3.8.1)
+  py:         71,
+  python3:    71,
+  javascript: 63, // JavaScript (Node.js 12.14.0)
+  js:         63,
+  node:       63,
+  cpp:        54, // C++ (GCC 9.2.0)
+  "c++":      54,
+  c:          50, // C (GCC 9.2.0)
+  java:       62, // Java (OpenJDK 13.0.1)
 };
 
-async function executeViaPiston(
+async function executeViaCloudSandbox(
   language: string,
   code: string,
   stdin: string,
   timeLimitMs: number
 ): Promise<ExecutionResult> {
-  const langConfig = PISTON_LANGUAGES[language.toLowerCase()];
-  if (!langConfig) {
+  const langKey = language.toLowerCase();
+  const langId = JUDGE0_LANGUAGES[langKey];
+  if (!langId) {
     return {
       status: "Internal Error",
       passed: false,
       stdout: "",
-      stderr: `Unsupported language: ${language}`,
+      stderr: `Language "${language}" is not supported by the runner.`,
       execTimeMs: 0,
       message: `Language "${language}" is not supported.`,
     };
+  }
+
+  // Adjust Java class name if submitted as public class other than Main
+  let sourceCode = code;
+  if (langKey === "java") {
+    sourceCode = sourceCode.replace(/public\s+class\s+\w+/, "public class Main");
   }
 
   const start = Date.now();
@@ -192,17 +198,15 @@ async function executeViaPiston(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Math.max(timeLimitMs + 10000, 15000));
 
-    const res = await fetch("https://emkc.org/api/v2/piston/execute", {
+    const res = await fetch("https://ce.judge0.com/submissions?wait=true", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        language: langConfig.language,
-        version: langConfig.version,
-        files: [{ name: getFilename(language), content: code }],
+        source_code: sourceCode,
+        language_id: langId,
         stdin: stdin || "",
-        run_timeout: timeLimitMs,
-        compile_timeout: 10000,
+        cpu_time_limit: Math.max(Math.round(timeLimitMs / 1000), 1),
       }),
     });
     clearTimeout(timeout);
@@ -221,53 +225,55 @@ async function executeViaPiston(
 
     const data = await res.json();
     const execTimeMs = Date.now() - start;
+    const statusId = data.status?.id;
 
-    // Piston returns { compile?: { stdout, stderr, code, output }, run: { stdout, stderr, code, signal, output } }
-    const compile = data.compile;
-    const run = data.run;
+    // Status IDs in Judge0:
+    // 3 = Accepted
+    // 4 = Wrong Answer
+    // 5 = Time Limit Exceeded
+    // 6 = Compilation Error
+    // 7-12 = Runtime Error
+    // 13 = Internal Error
+    // 14 = Exec Format Error
 
-    // Check compilation errors first (C++, C, Java)
-    if (compile && compile.code !== 0 && compile.stderr) {
+    if (statusId === 6) {
       return {
         status: "Compilation Error",
         passed: false,
-        stdout: compile.stdout || "",
-        stderr: (compile.stderr || compile.output || "").slice(0, 3000),
+        stdout: data.stdout || "",
+        stderr: (data.compile_output || data.stderr || "").slice(0, 3000),
         execTimeMs,
         message: "Compilation failed.",
       };
     }
 
-    // Check runtime errors
-    if (run && run.signal === "SIGKILL") {
+    if (statusId === 5) {
       return {
         status: "Time Limit Exceeded",
         passed: false,
-        stdout: run.stdout || "",
-        stderr: run.stderr || "",
+        stdout: data.stdout || "",
+        stderr: data.stderr || "",
         execTimeMs,
         message: `Execution exceeded time limit of ${timeLimitMs}ms.`,
       };
     }
 
-    if (run && run.code !== 0) {
-      const stderr = run.stderr || run.output || "";
-      const isSyntaxErr = /SyntaxError|IndentationError|TabError|Unexpected token|error:/.test(stderr);
+    if (statusId && statusId >= 7 && statusId <= 12) {
       return {
-        status: isSyntaxErr ? "Compilation Error" : "Runtime Error",
+        status: "Runtime Error",
         passed: false,
-        stdout: run.stdout || "",
-        stderr: stderr.slice(0, 3000),
+        stdout: data.stdout || "",
+        stderr: (data.stderr || data.message || "").slice(0, 3000),
         execTimeMs,
-        message: isSyntaxErr ? "Syntax/compilation error in code." : "Program exited with non-zero exit code.",
+        message: "Program exited with runtime error.",
       };
     }
 
     return {
       status: "Accepted",
       passed: true,
-      stdout: run?.stdout || run?.output || "",
-      stderr: run?.stderr || "",
+      stdout: data.stdout || "",
+      stderr: data.stderr || "",
       execTimeMs,
     };
   } catch (err: any) {
@@ -280,7 +286,7 @@ async function executeViaPiston(
       execTimeMs: Date.now() - start,
       message: isAbort
         ? `Execution exceeded time limit of ${timeLimitMs}ms.`
-        : "Execution timed out or cloud service unreachable. Please try again.",
+        : "Execution timed out or runner service unreachable. Please try again.",
     };
   }
 }
@@ -307,7 +313,12 @@ async function executeLocalPython(code: string, stdin: string, timeLimitMs: numb
     writeFileSync(srcPath, code, "utf-8");
 
     const pyCmds = process.platform === "win32"
-      ? ["python", "py -3", "py", "python3"]
+      ? [
+          "python",
+          "C:\\Users\\Acer\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+          "py",
+          "python3",
+        ]
       : ["python3", "python"];
 
     let res: any = null;
@@ -664,13 +675,13 @@ export async function executeCode(
   } else if (lang === "java") {
     rawResult = await executeLocalJava(code, stdin, limit);
   } else {
-    // Unknown language: try Piston directly
-    rawResult = await executeViaPiston(lang, code, stdin, limit);
+    // Unknown language: try Cloud sandbox directly
+    rawResult = await executeViaCloudSandbox(lang, code, stdin, limit);
   }
 
-  // 2. If local execution encountered Internal Error (missing compiler/runtime), fallback to Piston cloud
+  // 2. If local execution encountered Internal Error (missing compiler/runtime), fallback to Cloud sandbox
   if (rawResult.status === "Internal Error") {
-    rawResult = await executeViaPiston(lang, code, stdin, limit);
+    rawResult = await executeViaCloudSandbox(lang, code, stdin, limit);
   }
 
   // 3. If executed successfully, compare output against expected
