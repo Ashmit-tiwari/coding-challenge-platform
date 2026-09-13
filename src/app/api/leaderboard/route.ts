@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getStudentSession } from "@/lib/session";
-import { ok, publicUser, safeJson } from "@/lib/api";
+import { ok, safeJson } from "@/lib/api";
 
-// GET /api/leaderboard — Fast Batch Query
+// GET /api/leaderboard — Fast Batch Query & Full Contract Matching
 export async function GET(req: NextRequest) {
   const session = await getStudentSession();
   const url = new URL(req.url);
@@ -20,16 +20,37 @@ export async function GET(req: NextRequest) {
     where.submissions = { some: { createdAt: { gte: since } } };
   }
 
-  const users = await db.user.findMany({
-    where,
-    include: { avatar: true, achievements: { include: { achievement: { select: { key: true, icon: true, rarity: true, name: true } } }, take: 12 } },
-    orderBy: [{ xp: "desc" }, { currentStreak: "desc" }, { createdAt: "asc" }],
-    take: limit,
-  });
+  // 1. Run users search and hallOfFame weekly winners concurrently in parallel
+  const [users, winners] = await Promise.all([
+    db.user.findMany({
+      where,
+      include: {
+        avatar: true,
+        achievements: {
+          include: {
+            achievement: {
+              select: { key: true, icon: true, rarity: true, name: true }
+            }
+          },
+          take: 12
+        }
+      },
+      orderBy: [{ xp: "desc" }, { currentStreak: "desc" }, { createdAt: "asc" }],
+      take: limit,
+    }),
+    db.weeklyWinner.findMany({
+      orderBy: [{ createdAt: "desc" }, { rank: "asc" }],
+      take: 30,
+      include: {
+        user: { select: { id: true, uid: true, name: true, year: true, avatar: true } },
+        challenge: { select: { title: true, slug: true } },
+      },
+    }),
+  ]);
 
   const userIds = users.map((u) => u.id);
 
-  // Single batch query for distinct solves across all users
+  // 2. Single batch query for distinct solves across all users
   const userSubs = await db.submission.findMany({
     where: { userId: { in: userIds }, passedAll: true },
     select: { userId: true, challengeId: true },
@@ -48,25 +69,29 @@ export async function GET(req: NextRequest) {
 
   const ranked = users.map((u, i) => {
     const achievementBadges = u.achievements.slice(0, 4).map((ua) => ua.achievement);
+    const isMe = session?.userId === u.id;
     return {
       rank: i + 1,
       id: u.id,
       uid: u.uid,
       name: u.name,
       year: u.year,
-      avatar: u.avatar ? JSON.parse(u.avatar.config) : {},
+      avatar: u.avatar ? safeJson(u.avatar.config, {}) : {},
       xp: u.xp,
       level: u.level,
       levelName: u.levelName,
       solvedCount: solvedMap[u.id] || 0,
       currentStreak: u.currentStreak,
       longestStreak: u.longestStreak,
+      achievements: achievementBadges,
       badges: achievementBadges,
-      isCurrentUser: session?.userId === u.id,
+      isMe,
+      isCurrentUser: isMe,
       trend: "same" as const,
     };
   });
 
+  // Current user rank
   let currentUserRank = null;
   if (session) {
     const idx = ranked.findIndex((r) => r.id === session.userId);
@@ -78,28 +103,30 @@ export async function GET(req: NextRequest) {
         include: { avatar: true },
       });
       if (me) {
-        const higherCount = await db.user.count({
-          where: { isBanned: false, xp: { gt: me.xp } },
-        });
-        const mySubs = await db.submission.findMany({
-          where: { userId: me.id, passedAll: true },
-          select: { challengeId: true },
-          distinct: ["challengeId"],
-        });
+        const [higherCount, mySubs] = await Promise.all([
+          db.user.count({ where: { isBanned: false, xp: { gt: me.xp } } }),
+          db.submission.findMany({
+            where: { userId: me.id, passedAll: true },
+            select: { challengeId: true },
+            distinct: ["challengeId"],
+          }),
+        ]);
         currentUserRank = {
           rank: higherCount + 1,
           id: me.id,
           uid: me.uid,
           name: me.name,
           year: me.year,
-          avatar: me.avatar ? JSON.parse(me.avatar.config) : {},
+          avatar: me.avatar ? safeJson(me.avatar.config, {}) : {},
           xp: me.xp,
           level: me.level,
           levelName: me.levelName,
           solvedCount: mySubs.length,
           currentStreak: me.currentStreak,
           longestStreak: me.longestStreak,
+          achievements: [],
           badges: [],
+          isMe: true,
           isCurrentUser: true,
           trend: "same" as const,
         };
@@ -107,9 +134,32 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Format hall of fame weekly winners
+  const hallOfFame = winners.map((w) => ({
+    id: w.id,
+    weekLabel: w.weekLabel,
+    year: w.year,
+    rank: w.rank,
+    title: w.title,
+    adminNote: w.adminNote,
+    createdAt: w.createdAt.toISOString(),
+    challenge: w.challenge,
+    user: {
+      id: w.user.id,
+      uid: w.user.uid,
+      name: w.user.name,
+      year: w.user.year,
+      avatar: w.user.avatar ? safeJson(w.user.avatar.config, {}) : {},
+    },
+  }));
+
   return ok({
     leaderboard: ranked,
+    scope,
+    period,
+    myMovement: "same" as const,
     currentUser: currentUserRank,
+    hallOfFame,
     meta: {
       scope,
       period,
