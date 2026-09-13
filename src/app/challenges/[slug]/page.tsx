@@ -353,9 +353,9 @@ function ChallengeDetail() {
         setTabSwitchesCount(tabSwitchesRef.current);
       } else {
         const count = tabSwitchesRef.current;
-        toast.warning(`⚠️ Warning: Tab switch detected! (Count: ${count})`, {
-          description: "Tab switching and clipboard activities are recorded for anti-cheat audit.",
-          duration: 4000,
+        toast.error(`🚨 TAB SWITCH DETECTED! (Count: ${count})`, {
+          description: "Leaving this challenge tab is logged in your submission audit for anti-cheat review.",
+          duration: 5000,
         });
       }
     };
@@ -364,9 +364,9 @@ function ChallengeDetail() {
       if (!document.hidden) {
         tabSwitchesRef.current += 1;
         setTabSwitchesCount(tabSwitchesRef.current);
-        toast.warning(`⚠️ Warning: Window defocus detected! (Count: ${tabSwitchesRef.current})`, {
-          description: "Active coding window lost focus. Recorded for anti-cheat audit.",
-          duration: 3500,
+        toast.error(`🚨 WINDOW DEFOCUS DETECTED! (Count: ${tabSwitchesRef.current})`, {
+          description: "Active coding focus was lost. This tab switch is recorded for anti-cheat review.",
+          duration: 4500,
         });
       }
     };
@@ -1133,7 +1133,19 @@ function EditorPanel({
   const supportedLangOptions = supportedLangs.length > 0 ? supportedLangs : ["python", "cpp", "javascript"];
 
   return (
-    <Card className="overflow-hidden">
+    <div className="space-y-2">
+      {tabSwitchesCount > 0 && (
+        <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg bg-rose-500/15 border-2 border-rose-500/50 text-rose-700 dark:text-rose-300 text-xs font-semibold animate-pulse shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-rose-600 animate-ping" />
+            <span>🚨 Warning: {tabSwitchesCount} Tab Switch{tabSwitchesCount > 1 ? "es" : ""} Detected!</span>
+          </div>
+          <span className="text-[10px] font-mono bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/40">
+            Recorded for Admin Review
+          </span>
+        </div>
+      )}
+      <Card className="overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border bg-muted/30 px-3 py-2">
         <div className="flex items-center gap-2">
@@ -1230,6 +1242,7 @@ function EditorPanel({
         </span>
       </div>
     </Card>
+  </div>
   );
 }
 

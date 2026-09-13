@@ -222,20 +222,22 @@ function SubmissionsContent() {
                     </TableCell>
                     <TableCell>
                       {(s.tabSwitchesCount || 0) > 0 || (s.totalPastedLines || 0) > 0 ? (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 items-start">
                           {(s.tabSwitchesCount || 0) > 0 && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/10 whitespace-nowrap">
-                              ⚠️ {s.tabSwitchesCount} tab{s.tabSwitchesCount > 1 ? "s" : ""}
+                            <Badge className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-300 border-rose-500/50 text-[10px] font-bold gap-1 shadow-sm whitespace-nowrap">
+                              🚨 {s.tabSwitchesCount} Tab Switch{s.tabSwitchesCount > 1 ? "es" : ""}
                             </Badge>
                           )}
                           {(s.totalPastedLines || 0) > 0 && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-rose-700 dark:text-rose-300 border-rose-500/40 bg-rose-500/10 whitespace-nowrap">
-                              🔴 {s.totalPastedLines}p lines
+                            <Badge className="bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-300 border-red-500/50 text-[10px] font-bold gap-1 shadow-sm whitespace-nowrap">
+                              📋 {s.totalPastedLines} Pasted Lines
                             </Badge>
                           )}
                         </div>
                       ) : (
-                        <span className="text-[10px] text-muted-foreground">Clean</span>
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px]">
+                          ✓ 0 (Clean)
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums">

@@ -229,8 +229,8 @@ export default function SubmissionInspectorPage() {
             {/* ANTI-CHEAT & CODE INTEGRITY TELEMETRY CARD */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
               <Card className={cn(
-                "border overflow-hidden",
-                hasIntegrityFlags ? "border-amber-500/50 bg-amber-500/5" : "border-border/60"
+                "border overflow-hidden shadow-sm",
+                hasIntegrityFlags ? "border-rose-500/60 bg-rose-500/5 ring-1 ring-rose-500/30" : "border-border/60"
               )}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
@@ -239,8 +239,8 @@ export default function SubmissionInspectorPage() {
                       <CardTitle className="text-sm font-semibold">Code Integrity & Anti-Cheat Telemetry</CardTitle>
                     </div>
                     {hasIntegrityFlags ? (
-                      <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">
-                        ⚠️ Suspicious Activity Logged
+                      <Badge className="bg-rose-500 text-white font-bold text-xs gap-1.5 shadow-sm">
+                        🚨 Anti-Cheat Warning: Tab Switching & Pasting Detected
                       </Badge>
                     ) : (
                       <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs">
