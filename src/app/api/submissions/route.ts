@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   });
   const hadSolvedBefore = !!alreadySolved;
 
-  // run each test case
+  // run each test case — PARALLEL execution with early compilation error exit
   const timeLimitMs = challenge.timeLimitMs || 2000;
   const memoryLimitMb = challenge.memoryLimitMb || 256;
   const results: any[] = [];
@@ -99,41 +99,73 @@ export async function POST(req: NextRequest) {
   let totalExecMs = 0;
   let worstStderr = "";
 
-  for (const tc of challenge.testCases) {
-    const r = await executeCode(langKey, code, tc.input, tc.expectedOutput, timeLimitMs, memoryLimitMb);
-    results.push({
-      name: tc.name,
-      isHidden: tc.isHidden,
-      status: r.status,
-      passed: r.passed,
-      execTimeMs: r.execTimeMs,
-      stdout: tc.isHidden && !r.passed ? "" : r.stdout,
-      stderr: tc.isHidden && !r.passed ? "" : (r.stderr || "").slice(0, 1500),
-      expected: tc.isHidden ? undefined : tc.expectedOutput,
-      message: tc.isHidden && !r.passed ? "Hidden test case failed." : r.message,
-    });
-    if (r.passed) {
-      passedCount++;
-    } else {
-      // Pick the most severe failure status
-      if (r.status === "Internal Error" && worstStatus !== "Internal Error") {
-        worstStatus = "Internal Error";
-      } else if (r.status === "Compilation Error" && worstStatus !== "Internal Error") {
-        worstStatus = "Compilation Error";
-      } else if (r.status === "Runtime Error" && worstStatus !== "Internal Error" && worstStatus !== "Compilation Error") {
-        worstStatus = "Runtime Error";
-      } else if (r.status === "Time Limit Exceeded" && worstStatus === "Accepted") {
-        worstStatus = "Time Limit Exceeded";
-      } else if (r.status === "Memory Limit Exceeded" && worstStatus === "Accepted") {
-        worstStatus = "Memory Limit Exceeded";
-      } else if (r.status === "Wrong Answer" && worstStatus === "Accepted") {
-        worstStatus = "Wrong Answer";
-      } else if (worstStatus === "Accepted") {
-        worstStatus = r.status || "Wrong Answer";
-      }
-      if (r.stderr && !worstStderr) worstStderr = r.stderr;
+  // Run the first test case to detect compilation errors before running the rest
+  const firstTc = challenge.testCases[0];
+  const firstResult = await executeCode(langKey, code, firstTc.input, firstTc.expectedOutput, timeLimitMs, memoryLimitMb);
+
+  if (firstResult.status === "Compilation Error") {
+    // Early exit: same broken code will fail all test cases identically
+    for (const tc of challenge.testCases) {
+      results.push({
+        name: tc.name,
+        isHidden: tc.isHidden,
+        status: "Compilation Error",
+        passed: false,
+        execTimeMs: firstResult.execTimeMs,
+        stdout: tc.isHidden ? "" : firstResult.stdout,
+        stderr: tc.isHidden ? "" : (firstResult.stderr || "").slice(0, 1500),
+        expected: tc.isHidden ? undefined : tc.expectedOutput,
+        message: tc.isHidden ? "Hidden test case failed." : (firstResult.message || "Compilation error."),
+      });
     }
-    totalExecMs = Math.max(totalExecMs, r.execTimeMs);
+    worstStatus = "Compilation Error";
+    worstStderr = firstResult.stderr;
+    totalExecMs = firstResult.execTimeMs;
+  } else {
+    // First test case succeeded or had a runtime issue — run remaining tests in PARALLEL
+    const remainingTcs = challenge.testCases.slice(1);
+    const remainingPromises = remainingTcs.map((tc) =>
+      executeCode(langKey, code, tc.input, tc.expectedOutput, timeLimitMs, memoryLimitMb)
+        .then((r) => ({ tc, r }))
+    );
+    const remainingResults = await Promise.all(remainingPromises);
+
+    // Combine first result + remaining results
+    const allResults = [
+      { tc: firstTc, r: firstResult },
+      ...remainingResults,
+    ];
+
+    for (const { tc, r } of allResults) {
+      results.push({
+        name: tc.name,
+        isHidden: tc.isHidden,
+        status: r.status,
+        passed: r.passed,
+        execTimeMs: r.execTimeMs,
+        stdout: tc.isHidden && !r.passed ? "" : r.stdout,
+        stderr: tc.isHidden && !r.passed ? "" : (r.stderr || "").slice(0, 1500),
+        expected: tc.isHidden ? undefined : tc.expectedOutput,
+        message: tc.isHidden && !r.passed ? "Hidden test case failed." : r.message,
+      });
+      if (r.passed) {
+        passedCount++;
+      } else {
+        if (r.status === "Compilation Error" && worstStatus !== "Internal Error") {
+          worstStatus = "Compilation Error";
+        } else if (r.status === "Runtime Error" && worstStatus !== "Internal Error" && worstStatus !== "Compilation Error") {
+          worstStatus = "Runtime Error";
+        } else if (r.status === "Time Limit Exceeded" && worstStatus === "Accepted") {
+          worstStatus = "Time Limit Exceeded";
+        } else if (r.status === "Wrong Answer" && worstStatus === "Accepted") {
+          worstStatus = "Wrong Answer";
+        } else if (worstStatus === "Accepted") {
+          worstStatus = r.status || "Wrong Answer";
+        }
+        if (r.stderr && !worstStderr) worstStderr = r.stderr;
+      }
+      totalExecMs = Math.max(totalExecMs, r.execTimeMs);
+    }
   }
 
   const totalTests = challenge.testCases.length;
@@ -253,45 +285,48 @@ export async function POST(req: NextRequest) {
   const leveledUp = updatedUser && updatedUser.level > user.level;
   const levelInfo = updatedUser ? { level: updatedUser.level, levelName: updatedUser.levelName, xp: updatedUser.xp } : null;
 
-  // similarity check in background
-  try {
-    const others = await db.submission.findMany({
-      where: {
-        challengeId: challenge.id,
-        language: langKey,
-        passedAll: true,
-        userId: { not: user.id },
-      },
-      select: { id: true, code: true, userId: true },
-      take: 20,
-    });
-    for (const o of others) {
-      const { score, method, reason } = compareCode(code, o.code);
-      if (score >= SIMILARITY_THRESHOLD) {
-        const existing = await db.plagiarismFlag.findFirst({
-          where: {
-            OR: [
-              { submissionAId: submission.id, submissionBId: o.id },
-              { submissionAId: o.id, submissionBId: submission.id },
-            ],
-          },
-        });
-        if (!existing) {
-          await db.plagiarismFlag.create({
-            data: {
-              submissionAId: submission.id,
-              submissionBId: o.id,
-              similarity: score,
-              method,
-              reason,
+  // Fire-and-forget: similarity/plagiarism check runs AFTER response is sent
+  // This avoids blocking the HTTP response with heavy DB queries
+  void (async () => {
+    try {
+      const others = await db.submission.findMany({
+        where: {
+          challengeId: challenge.id,
+          language: langKey,
+          passedAll: true,
+          userId: { not: user.id },
+        },
+        select: { id: true, code: true, userId: true },
+        take: 20,
+      });
+      for (const o of others) {
+        const { score, method, reason } = compareCode(code, o.code);
+        if (score >= SIMILARITY_THRESHOLD) {
+          const existing = await db.plagiarismFlag.findFirst({
+            where: {
+              OR: [
+                { submissionAId: submission.id, submissionBId: o.id },
+                { submissionAId: o.id, submissionBId: submission.id },
+              ],
             },
           });
+          if (!existing) {
+            await db.plagiarismFlag.create({
+              data: {
+                submissionAId: submission.id,
+                submissionBId: o.id,
+                similarity: score,
+                method,
+                reason,
+              },
+            });
+          }
         }
       }
+    } catch (e) {
+      console.error("similarity error", e);
     }
-  } catch (e) {
-    console.error("similarity error", e);
-  }
+  })();
 
   return ok({
     submission: {
